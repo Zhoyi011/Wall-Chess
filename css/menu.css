@@ -1,0 +1,416 @@
+/* 菜单页面样式 */
+.menu-background {
+    min-height: 100vh;
+    background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d);
+    background-size: 400% 400%;
+    animation: gradientShift 15s ease infinite;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    position: relative;
+    overflow: hidden;
+}
+
+.menu-background::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M 10 0 L 0 0 0 10" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="0.5"/></pattern></defs><rect width="100" height="100" fill="url(%23grid)"/></svg>');
+    opacity: 0.3;
+}
+
+@keyframes gradientShift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+.menu-container {
+    background: rgba(44, 62, 80, 0.95);
+    backdrop-filter: blur(20px);
+    border-radius: var(--border-radius-lg);
+    padding: 40px;
+    box-shadow: var(--shadow-xl);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    max-width: 800px;
+    width: 100%;
+    position: relative;
+    z-index: 1;
+    animation: slideUp 0.8s ease;
+}
+
+.menu-header {
+    text-align: center;
+    margin-bottom: 40px;
+}
+
+.game-title {
+    font-size: 3.5rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, #ff6b6b, #4ecdc4, #45b7d1);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 8px;
+    text-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.game-subtitle {
+    font-size: 1.2rem;
+    color: var(--gray-color);
+    font-weight: 300;
+    letter-spacing: 2px;
+}
+
+.menu-nav {
+    display: grid;
+    gap: 30px;
+}
+
+.menu-section h2 {
+    color: var(--light-color);
+    margin-bottom: 16px;
+    font-size: 1.3rem;
+    font-weight: 600;
+    border-left: 4px solid var(--primary-color);
+    padding-left: 12px;
+}
+
+.menu-btn {
+    width: 100%;
+    padding: 20px 24px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: var(--border-radius);
+    color: var(--light-color);
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+    text-align: left;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 12px;
+    position: relative;
+    overflow: hidden;
+}
+
+.menu-btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+    transition: var(--transition);
+}
+
+.menu-btn:hover::before {
+    left: 100%;
+}
+
+.menu-btn:hover {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.3);
+    transform: translateX(8px);
+}
+
+.menu-btn.primary {
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+    border: none;
+}
+
+.menu-btn.secondary {
+    background: linear-gradient(135deg, var(--secondary-color), var(--secondary-dark));
+    border: none;
+}
+
+.btn-icon {
+    font-size: 1.5rem;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+}
+
+.btn-subtitle {
+    display: block;
+    font-size: 0.9rem;
+    font-weight: 400;
+    color: rgba(255, 255, 255, 0.8);
+    margin-top: 4px;
+}
+
+.menu-footer {
+    margin-top: 40px;
+    padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+}
+
+.stat-item {
+    text-align: center;
+    padding: 16px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: var(--border-radius);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.stat-value {
+    display: block;
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--primary-color);
+    margin-bottom: 4px;
+}
+
+.stat-label {
+    font-size: 0.9rem;
+    color: var(--gray-color);
+}
+
+/* 难度选择样式 */
+.difficulty-options {
+    display: grid;
+    gap: 12px;
+    margin-bottom: 24px;
+}
+
+.difficulty-btn {
+    padding: 20px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 2px solid transparent;
+    border-radius: var(--border-radius);
+    color: var(--light-color);
+    cursor: pointer;
+    transition: var(--transition);
+    text-align: left;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.difficulty-btn:hover {
+    background: rgba(255, 255, 255, 0.15);
+    transform: translateY(-2px);
+}
+
+.difficulty-btn.easy {
+    border-color: var(--secondary-color);
+}
+
+.difficulty-btn.medium {
+    border-color: var(--primary-color);
+}
+
+.difficulty-btn.hard {
+    border-color: var(--accent-color);
+}
+
+.difficulty-btn.selected {
+    background: rgba(255, 255, 255, 0.2);
+    transform: scale(1.02);
+}
+
+.difficulty-icon {
+    font-size: 2rem;
+    width: 50px;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+}
+
+.difficulty-name {
+    font-size: 1.2rem;
+    font-weight: 600;
+    display: block;
+}
+
+.difficulty-desc {
+    font-size: 0.9rem;
+    color: var(--gray-color);
+    display: block;
+}
+
+/* 玩家数量选择 */
+.player-count-selection {
+    margin-bottom: 24px;
+}
+
+.player-options {
+    display: flex;
+    gap: 12px;
+    margin-top: 12px;
+}
+
+.player-count-btn {
+    flex: 1;
+    padding: 16px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 2px solid transparent;
+    border-radius: var(--border-radius);
+    color: var(--light-color);
+    cursor: pointer;
+    transition: var(--transition);
+    font-weight: 600;
+}
+
+.player-count-btn:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.player-count-btn.active {
+    background: var(--primary-color);
+    border-color: var(--primary-dark);
+}
+
+/* 设置组样式 */
+.settings-group {
+    margin-bottom: 24px;
+}
+
+.settings-group h4 {
+    color: var(--light-color);
+    margin-bottom: 16px;
+    font-size: 1.1rem;
+}
+
+.setting-item {
+    display: flex;
+    align-items: center;
+    justify-content: between;
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.setting-item:last-child {
+    border-bottom: none;
+}
+
+.setting-item label {
+    flex: 1;
+    color: var(--light-color);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.setting-group {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.setting-group label {
+    color: var(--light-color);
+    min-width: 100px;
+}
+
+.setting-group select {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: var(--border-radius-sm);
+    color: var(--light-color);
+    padding: 8px 12px;
+    flex: 1;
+}
+
+.setting-group select:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+/* 说明内容样式 */
+.instructions-content,
+.credits-content {
+    color: var(--light-color);
+    line-height: 1.6;
+}
+
+.instruction-section,
+.credits-section {
+    margin-bottom: 24px;
+}
+
+.instruction-section h4,
+.credits-section h4 {
+    color: var(--primary-color);
+    margin-bottom: 12px;
+    font-size: 1.1rem;
+}
+
+.instruction-section ul,
+.instruction-section ol {
+    padding-left: 20px;
+    margin: 12px 0;
+}
+
+.instruction-section li {
+    margin-bottom: 8px;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .menu-container {
+        padding: 24px;
+        margin: 10px;
+    }
+    
+    .game-title {
+        font-size: 2.5rem;
+    }
+    
+    .menu-btn {
+        padding: 16px 20px;
+        font-size: 1rem;
+    }
+    
+    .stats {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+    
+    .player-options {
+        flex-direction: column;
+    }
+}
+
+@media (max-width: 480px) {
+    .menu-container {
+        padding: 16px;
+    }
+    
+    .game-title {
+        font-size: 2rem;
+    }
+    
+    .menu-btn {
+        padding: 14px 16px;
+        font-size: 0.9rem;
+    }
+    
+    .btn-icon {
+        font-size: 1.2rem;
+        width: 32px;
+        height: 32px;
+    }
+}

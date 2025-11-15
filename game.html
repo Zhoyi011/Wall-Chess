@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>围墙争夺战 - 游戏中</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/game.css">
+</head>
+<body>
+    <div class="game-container">
+        <!-- 游戏头部信息 -->
+        <header class="game-header">
+            <div class="header-left">
+                <button id="menu-btn" class="header-btn" title="返回菜单">
+                    <span>🏠</span>
+                    菜单
+                </button>
+                <button id="restart-btn" class="header-btn" title="重新开始">
+                    <span>🔄</span>
+                    重新开始
+                </button>
+            </div>
+            
+            <div class="header-center">
+                <h1 class="game-title">围墙争夺战</h1>
+                <div class="game-info">
+                    <span id="game-mode">单人游戏 - 中等难度</span>
+                    <span class="separator">•</span>
+                    <span id="board-size">9×9</span>
+                </div>
+            </div>
+            
+            <div class="header-right">
+                <button id="undo-btn" class="header-btn" title="悔棋" disabled>
+                    <span>↶</span>
+                    悔棋
+                </button>
+                <button id="hint-btn" class="header-btn" title="显示提示">
+                    <span>💡</span>
+                    提示
+                </button>
+            </div>
+        </header>
+
+        <!-- 游戏主要内容区域 -->
+        <main class="game-main">
+            <!-- 左侧：游戏棋盘 -->
+            <section class="board-section">
+                <div class="board-container">
+                    <div id="game-board" class="game-board">
+                        <!-- 棋盘由JavaScript动态生成 -->
+                    </div>
+                    <div class="board-overlay" id="board-overlay">
+                        <div class="overlay-content" id="overlay-content">
+                            <!-- 游戏结束、暂停等覆盖层内容 -->
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 右侧：游戏信息和控制 -->
+            <aside class="info-section">
+                <!-- 游戏状态指示器 -->
+                <div class="status-panel">
+                    <div class="phase-indicator" id="phase-indicator">
+                        <span class="phase-icon">🎯</span>
+                        <span class="phase-text">放置阶段</span>
+                    </div>
+                    <div class="turn-indicator" id="turn-indicator">
+                        <span class="turn-text">玩家1的回合</span>
+                        <div class="turn-timer" id="turn-timer">
+                            <span>思考时间: </span>
+                            <span id="timer-value">00:00</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 玩家信息面板 -->
+                <div class="players-panel">
+                    <div class="player-info active" id="player1-info" data-player="0">
+                        <div class="player-header">
+                            <div class="player-color" style="background: linear-gradient(135deg, #ff6b6b, #c0392b);"></div>
+                            <h3 class="player-name">玩家1</h3>
+                            <div class="player-type">人类</div>
+                        </div>
+                        <div class="player-stats">
+                            <div class="stat">
+                                <span class="stat-label">棋子:</span>
+                                <span class="stat-value" id="player1-pieces">0/4</span>
+                            </div>
+                            <div class="stat">
+                                <span class="stat-label">围墙:</span>
+                                <span class="stat-value" id="player1-walls">∞</span>
+                            </div>
+                            <div class="stat score">
+                                <span class="stat-label">得分:</span>
+                                <span class="stat-value" id="player1-score">0</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="player-info" id="player2-info" data-player="1">
+                        <div class="player-header">
+                            <div class="player-color" style="background: linear-gradient(135deg, #4ecdc4, #16a085);"></div>
+                            <h3 class="player-name">玩家2</h3>
+                            <div class="player-type">AI - 中等</div>
+                        </div>
+                        <div class="player-stats">
+                            <div class="stat">
+                                <span class="stat-label">棋子:</span>
+                                <span class="stat-value" id="player2-pieces">0/4</span>
+                            </div>
+                            <div class="stat">
+                                <span class="stat-label">围墙:</span>
+                                <span class="stat-value" id="player2-walls">∞</span>
+                            </div>
+                            <div class="stat score">
+                                <span class="stat-label">得分:</span>
+                                <span class="stat-value" id="player2-score">0</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 玩家3和4的面板（多人游戏时显示） -->
+                    <div class="player-info hidden" id="player3-info" data-player="2">
+                        <div class="player-header">
+                            <div class="player-color" style="background: linear-gradient(135deg, #ffeaa7, #fdcb6e);"></div>
+                            <h3 class="player-name">玩家3</h3>
+                            <div class="player-type">人类</div>
+                        </div>
+                        <div class="player-stats">
+                            <div class="stat">
+                                <span class="stat-label">棋子:</span>
+                                <span class="stat-value" id="player3-pieces">0/4</span>
+                            </div>
+                            <div class="stat">
+                                <span class="stat-label">围墙:</span>
+                                <span class="stat-value" id="player3-walls">∞</span>
+                            </div>
+                            <div class="stat score">
+                                <span class="stat-label">得分:</span>
+                                <span class="stat-value" id="player3-score">0</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="player-info hidden" id="player4-info" data-player="3">
+                        <div class="player-header">
+                            <div class="player-color" style="background: linear-gradient(135deg, #a29bfe, #6c5ce7);"></div>
+                            <h3 class="player-name">玩家4</h3>
+                            <div class="player-type">人类</div>
+                        </div>
+                        <div class="player-stats">
+                            <div class="stat">
+                                <span class="stat-label">棋子:</span>
+                                <span class="stat-value" id="player4-pieces">0/4</span>
+                            </div>
+                            <div class="stat">
+                                <span class="stat-label">围墙:</span>
+                                <span class="stat-value" id="player4-walls">∞</span>
+                            </div>
+                            <div class="stat score">
+                                <span class="stat-label">得分:</span>
+                                <span class="stat-value" id="player4-score">0</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 游戏控制按钮 -->
+                <div class="controls-panel">
+                    <button id="change-piece-btn" class="control-btn" disabled>
+                        <span>🔄</span>
+                        更换棋子
+                    </button>
+                    <button id="pass-turn-btn" class="control-btn">
+                        <span>⏭️</span>
+                        跳过回合
+                    </button>
+                    <button id="pause-btn" class="control-btn">
+                        <span>⏸️</span>
+                        暂停游戏
+                    </button>
+                </div>
+
+                <!-- 游戏日志 -->
+                <div class="log-panel">
+                    <h4>游戏日志</h4>
+                    <div class="log-content" id="game-log">
+                        <div class="log-entry">游戏开始！</div>
+                        <!-- 日志条目会动态添加 -->
+                    </div>
+                </div>
+            </aside>
+        </main>
+
+        <!-- 游戏底部状态栏 -->
+        <footer class="game-footer">
+            <div class="footer-left">
+                <span id="game-status">游戏进行中...</span>
+            </div>
+            <div class="footer-center">
+                <span id="current-action">请放置你的棋子</span>
+            </div>
+            <div class="footer-right">
+                <span>回合: </span>
+                <span id="turn-count">1</span>
+            </div>
+        </footer>
+    </div>
+
+    <!-- 游戏暂停菜单 -->
+    <div id="pause-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>游戏暂停</h3>
+            </div>
+            <div class="modal-body">
+                <button class="modal-btn" id="resume-btn">
+                    <span>▶️</span>
+                    继续游戏
+                </button>
+                <button class="modal-btn" id="restart-modal-btn">
+                    <span>🔄</span>
+                    重新开始
+                </button>
+                <button class="modal-btn" id="menu-modal-btn">
+                    <span>🏠</span>
+                    返回主菜单
+                </button>
+                <button class="modal-btn" id="settings-modal-btn">
+                    <span>⚙️</span>
+                    游戏设置
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 游戏结束弹窗 -->
+    <div id="game-over-modal" class="modal">
+        <div class="modal-content game-over-content">
+            <div class="modal-header">
+                <h3 id="game-result-title">游戏结束</h3>
+            </div>
+            <div class="modal-body">
+                <div class="result-summary" id="result-summary">
+                    <!-- 结果摘要会动态生成 -->
+                </div>
+                <div class="winner-celebration" id="winner-celebration">
+                    <!-- 获胜者庆祝内容 -->
+                </div>
+                <div class="final-scores">
+                    <h4>最终得分</h4>
+                    <div class="score-board" id="final-score-board">
+                        <!-- 最终得分板会动态生成 -->
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="modal-btn secondary" id="review-game-btn">
+                    <span>📊</span>
+                    回顾游戏
+                </button>
+                <button class="modal-btn" id="play-again-btn">
+                    <span>🔄</span>
+                    再玩一次
+                </button>
+                <button class="modal-btn primary" id="back-to-menu-btn">
+                    <span>🏠</span>
+                    返回菜单
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI思考指示器 -->
+    <div id="ai-thinking-indicator" class="ai-indicator hidden">
+        <div class="ai-thinking-content">
+            <div class="spinner"></div>
+            <span>AI思考中...</span>
+        </div>
+    </div>
+
+    <script src="js/utils.js"></script>
+    <script src="js/settings.js"></script>
+    <script src="js/ai.js"></script>
+    <script src="js/game.js"></script>
+</body>
+</html>

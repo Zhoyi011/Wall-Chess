@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>围墙争夺战 - 主菜单</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/menu.css">
+</head>
+<body>
+    <div class="menu-background">
+        <div class="menu-container">
+            <!-- 游戏标题和Logo区域 -->
+            <header class="menu-header">
+                <h1 class="game-title">围墙争夺战</h1>
+                <div class="game-subtitle">策略 · 围地 · 征服</div>
+            </header>
+
+            <!-- 主菜单按钮区域 -->
+            <nav class="menu-nav">
+                <div class="menu-section">
+                    <h2>游戏模式</h2>
+                    <button class="menu-btn primary" id="single-player-btn">
+                        <span class="btn-icon">👤</span>
+                        单人游戏
+                        <span class="btn-subtitle">挑战AI对手</span>
+                    </button>
+                    <button class="menu-btn secondary" id="multi-player-btn">
+                        <span class="btn-icon">👥</span>
+                        多人游戏
+                        <span class="btn-subtitle">与朋友对战</span>
+                    </button>
+                </div>
+
+                <div class="menu-section">
+                    <h2>其他选项</h2>
+                    <button class="menu-btn" id="settings-btn">
+                        <span class="btn-icon">⚙️</span>
+                        游戏设置
+                    </button>
+                    <button class="menu-btn" id="instructions-btn">
+                        <span class="btn-icon">📖</span>
+                        游戏说明
+                    </button>
+                    <button class="menu-btn" id="credits-btn">
+                        <span class="btn-icon">❤️</span>
+                        制作人员
+                    </button>
+                </div>
+            </nav>
+
+            <!-- 游戏统计信息 -->
+            <footer class="menu-footer">
+                <div class="stats">
+                    <div class="stat-item">
+                        <span class="stat-value" id="games-played">0</span>
+                        <span class="stat-label">游戏次数</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-value" id="best-score">0</span>
+                        <span class="stat-label">最高得分</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-value" id="win-rate">0%</span>
+                        <span class="stat-label">胜率</span>
+                    </div>
+                </div>
+            </footer>
+        </div>
+    </div>
+
+    <!-- 单人游戏模式选择弹窗 -->
+    <div id="single-player-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>选择游戏难度</h3>
+                <button class="close-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="difficulty-options">
+                    <button class="difficulty-btn easy" data-difficulty="easy">
+                        <span class="difficulty-icon">😊</span>
+                        <span class="difficulty-name">简单</span>
+                        <span class="difficulty-desc">适合新手玩家</span>
+                    </button>
+                    <button class="difficulty-btn medium" data-difficulty="medium">
+                        <span class="difficulty-icon">😐</span>
+                        <span class="difficulty-name">中等</span>
+                        <span class="difficulty-desc">平衡的挑战</span>
+                    </button>
+                    <button class="difficulty-btn hard" data-difficulty="hard">
+                        <span class="difficulty-icon">😈</span>
+                        <span class="difficulty-name">困难</span>
+                        <span class="difficulty-desc">极具挑战性</span>
+                    </button>
+                </div>
+                <div class="game-settings">
+                    <div class="setting-group">
+                        <label for="board-size">棋盘大小:</label>
+                        <select id="board-size">
+                            <option value="7">7×7 (小)</option>
+                            <option value="9" selected>9×9 (中)</option>
+                            <option value="11">11×11 (大)</option>
+                        </select>
+                    </div>
+                    <div class="setting-group">
+                        <label for="wall-count">围墙数量:</label>
+                        <select id="wall-count">
+                            <option value="10">10个</option>
+                            <option value="15" selected>15个</option>
+                            <option value="20">20个</option>
+                            <option value="999">无限</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-cancel">取消</button>
+                <button class="btn-start" id="start-single-player">开始游戏</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 多人游戏设置弹窗 -->
+    <div id="multi-player-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>多人游戏设置</h3>
+                <button class="close-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="player-count-selection">
+                    <h4>玩家人数</h4>
+                    <div class="player-options">
+                        <button class="player-count-btn active" data-players="2">2人</button>
+                        <button class="player-count-btn" data-players="3">3人</button>
+                        <button class="player-count-btn" data-players="4">4人</button>
+                    </div>
+                </div>
+                <div class="player-settings">
+                    <div class="player-config" id="player-configs">
+                        <!-- 玩家配置会动态生成 -->
+                    </div>
+                </div>
+                <div class="game-settings">
+                    <div class="setting-group">
+                        <label for="mp-board-size">棋盘大小:</label>
+                        <select id="mp-board-size">
+                            <option value="7">7×7 (小)</option>
+                            <option value="9" selected>9×9 (中)</option>
+                            <option value="11">11×11 (大)</option>
+                        </select>
+                    </div>
+                    <div class="setting-group">
+                        <label for="mp-wall-count">围墙数量:</label>
+                        <select id="mp-wall-count">
+                            <option value="10">10个</option>
+                            <option value="15" selected>15个</option>
+                            <option value="20">20个</option>
+                            <option value="999">无限</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-cancel">取消</button>
+                <button class="btn-start" id="start-multi-player">开始游戏</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 设置弹窗 -->
+    <div id="settings-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>游戏设置</h3>
+                <button class="close-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="settings-group">
+                    <h4>界面设置</h4>
+                    <div class="setting-item">
+                        <label>
+                            <input type="checkbox" id="sound-enabled" checked>
+                            启用音效
+                        </label>
+                    </div>
+                    <div class="setting-item">
+                        <label>
+                            <input type="checkbox" id="animations-enabled" checked>
+                            启用动画
+                        </label>
+                    </div>
+                    <div class="setting-item">
+                        <label for="theme-select">主题:</label>
+                        <select id="theme-select">
+                            <option value="default">默认</option>
+                            <option value="dark">暗黑</option>
+                            <option value="light">明亮</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="settings-group">
+                    <h4>游戏规则</h4>
+                    <div class="setting-item">
+                        <label>
+                            <input type="checkbox" id="undo-enabled" checked>
+                            允许悔棋
+                        </label>
+                    </div>
+                    <div class="setting-item">
+                        <label>
+                            <input type="checkbox" id="hints-enabled">
+                            显示提示
+                        </label>
+                    </div>
+                    <div class="setting-item">
+                        <label for="max-undo">最大悔棋步数:</label>
+                        <select id="max-undo">
+                            <option value="5">5步</option>
+                            <option value="10" selected>10步</option>
+                            <option value="20">20步</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-cancel">取消</button>
+                <button class="btn-save" id="save-settings">保存设置</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 游戏说明弹窗 -->
+    <div id="instructions-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>游戏说明</h3>
+                <button class="close-btn">&times;</button>
+            </div>
+            <div class="modal-body instructions-content">
+                <div class="instruction-section">
+                    <h4>🎯 游戏目标</h4>
+                    <p>通过放置围墙来围出最大的领地，每个被完全包围的区域如果只包含你的棋子，该区域的所有格子都算作你的得分。</p>
+                </div>
+                <div class="instruction-section">
+                    <h4>🔄 游戏流程</h4>
+                    <ol>
+                        <li><strong>放置阶段</strong>：轮流放置4个棋子</li>
+                        <li><strong>移动阶段</strong>：移动棋子并放置围墙</li>
+                        <li><strong>围地得分</strong>：被围墙完全包围的区域会计分</li>
+                        <li><strong>游戏结束</strong>：当所有棋子都无法移动时结束</li>
+                    </ol>
+                </div>
+                <div class="instruction-section">
+                    <h4>🎮 基本操作</h4>
+                    <ul>
+                        <li><strong>放置棋子</strong>：点击空单元格</li>
+                        <li><strong>移动棋子</strong>：先点击自己的棋子，再点击目标位置</li>
+                        <li><strong>放置围墙</strong>：移动后点击出现的围墙选项</li>
+                        <li><strong>更换棋子</strong>：点击"更换棋子"按钮</li>
+                        <li><strong>悔棋</strong>：点击"悔棋"按钮回到上一步</li>
+                    </ul>
+                </div>
+                <div class="instruction-section">
+                    <h4>🏆 得分规则</h4>
+                    <ul>
+                        <li>每个被围领地格子 = 1分</li>
+                        <li>领地内只能有单一颜色的棋子</li>
+                        <li>领地必须被围墙完全包围</li>
+                        <li>游戏结束时得分最高的玩家获胜</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-close">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 制作人员弹窗 -->
+    <div id="credits-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>制作人员</h3>
+                <button class="close-btn">&times;</button>
+            </div>
+            <div class="modal-body credits-content">
+                <div class="credits-section">
+                    <h4>🎨 游戏设计</h4>
+                    <p>基于经典围地游戏改编</p>
+                </div>
+                <div class="credits-section">
+                    <h4>💻 程序开发</h4>
+                    <p>由AI助手协助开发</p>
+                </div>
+                <div class="credits-section">
+                    <h4>🎵 音效素材</h4>
+                    <p>使用免费音效资源</p>
+                </div>
+                <div class="credits-section">
+                    <h4>❤️ 特别感谢</h4>
+                    <p>感谢所有测试玩家提供的宝贵反馈</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-close">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/utils.js"></script>
+    <script src="js/menu.js"></script>
+</body>
+</html>
