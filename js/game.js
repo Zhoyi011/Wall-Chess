@@ -12,11 +12,14 @@ class WallGame {
         this.cells = Array(this.boardSize).fill().map(() => Array(this.boardSize).fill(null));
         this.horizontalWalls = Array(this.boardSize + 1).fill().map(() => Array(this.boardSize).fill(false));
         this.verticalWalls = Array(this.boardSize + 1).fill().map(() => Array(this.boardSize).fill(false));
+        this.territories = Array(this.boardSize).fill().map(() => Array(this.boardSize).fill(null));
         
         // UI状态
         this.selectedPiece = null;
         this.hasMoved = false;
         this.wallOptions = [];
+        this.touchStartTime = 0;
+        this.lastTouch = { x: 0, y: 0 };
         
         // 游戏历史
         this.history = [];
@@ -74,8 +77,9 @@ class WallGame {
         // 清除现有内容
         gameBoard.innerHTML = '';
         
-        // 设置棋盘尺寸和样式
-        const boardSizePx = 400;
+        // 设置棋盘尺寸和样式 - 移动端适配
+        const isMobile = this.isMobileDevice();
+        const boardSizePx = isMobile ? Math.min(window.innerWidth - 40, 400) : 400;
         gameBoard.style.width = `${boardSizePx}px`;
         gameBoard.style.height = `${boardSizePx}px`;
         gameBoard.style.position = 'relative';
@@ -84,6 +88,7 @@ class WallGame {
         gameBoard.style.borderRadius = '8px';
         gameBoard.style.margin = '0 auto';
         gameBoard.style.overflow = 'visible';
+        gameBoard.style.touchAction = 'manipulation';
 
         // 设置棋盘网格
         gameBoard.style.display = 'grid';
@@ -101,7 +106,7 @@ class WallGame {
                 cell.dataset.x = x;
                 cell.dataset.y = y;
                 
-                // 设置单元格样式
+                // 设置单元格样式 - 移动端适配
                 cell.style.border = '1px solid #95a5a6';
                 cell.style.display = 'flex';
                 cell.style.justifyContent = 'center';
@@ -110,12 +115,12 @@ class WallGame {
                 cell.style.cursor = 'pointer';
                 cell.style.transition = 'all 0.15s ease';
                 cell.style.backgroundColor = '#ffffff';
+                cell.style.userSelect = 'none';
+                cell.style.webkitUserSelect = 'none';
+                cell.style.webkitTapHighlightColor = 'transparent';
                 
-                cell.addEventListener('click', (e) => {
-                    console.log('单元格被点击:', x, y);
-                    e.stopPropagation();
-                    this.handleCellClick(x, y);
-                });
+                // 绑定触摸和点击事件
+                this.bindCellEvents(cell, x, y);
                 
                 fragment.appendChild(cell);
             }
@@ -123,8 +128,41 @@ class WallGame {
 
         gameBoard.appendChild(fragment);
         this.drawWalls();
+        this.updateTerritoriesDisplay();
         
         console.log('棋盘创建完成');
+    }
+
+    bindCellEvents(cell, x, y) {
+        // 移动端触摸事件
+        cell.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            this.touchStartTime = Date.now();
+            this.lastTouch = { x, y };
+        }, { passive: false });
+
+        cell.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const touchDuration = Date.now() - this.touchStartTime;
+            
+            // 防止长按误触
+            if (touchDuration < 500) {
+                this.handleCellClick(x, y);
+            }
+        }, { passive: false });
+
+        // 桌面端点击事件
+        cell.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.handleCellClick(x, y);
+        });
+    }
+
+    isMobileDevice() {
+        return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
+               window.innerWidth <= 768;
     }
 
     drawWalls() {
@@ -144,13 +182,11 @@ class WallGame {
             return;
         }
 
-        const boardSizePx = 400;
+        const boardSizePx = parseInt(gameBoard.style.width);
         const cellSize = boardSizePx / this.boardSize;
         const fragment = document.createDocumentFragment();
 
-        let wallCount = 0;
-
-        // 绘制水平围墙 - 修正位置计算
+        // 绘制水平围墙
         for (let y = 0; y < this.horizontalWalls.length; y++) {
             for (let x = 0; x < this.horizontalWalls[y].length; x++) {
                 if (this.horizontalWalls[y][x]) {
@@ -168,12 +204,11 @@ class WallGame {
                         border-radius: 1px;
                     `;
                     fragment.appendChild(wall);
-                    wallCount++;
                 }
             }
         }
 
-        // 绘制垂直围墙 - 修正位置计算
+        // 绘制垂直围墙
         for (let x = 0; x < this.verticalWalls.length; x++) {
             for (let y = 0; y < this.verticalWalls[x].length; y++) {
                 if (this.verticalWalls[x][y]) {
@@ -191,158 +226,176 @@ class WallGame {
                         border-radius: 1px;
                     `;
                     fragment.appendChild(wall);
-                    wallCount++;
                 }
             }
         }
 
         gameBoard.appendChild(fragment);
-        console.log(`围墙绘制完成，共绘制了 ${wallCount} 个围墙`);
     }
 
-    bindEvents() {
-        console.log('开始绑定事件...');
-        this.bindButtonEvents();
-        this.bindModalEvents();
+    // 检测领地
+    detectTerritories() {
+        console.log('开始检测领地...');
+        
+        // 重置领地状态
+        this.territories = Array(this.boardSize).fill().map(() => Array(this.boardSize).fill(null));
+        
+        // 重置玩家分数
+        this.players.forEach(player => player.score = 0);
+        
+        const visited = Array(this.boardSize).fill().map(() => Array(this.boardSize).fill(false));
+        
+        for (let y = 0; y < this.boardSize; y++) {
+            for (let x = 0; x < this.boardSize; x++) {
+                if (!visited[y][x]) {
+                    const region = this.bfsRegion(x, y, visited);
+                    
+                    if (this.isRegionEnclosed(region)) {
+                        const owner = this.getRegionOwner(region);
+                        
+                        if (owner !== null) {
+                            // 标记领地
+                            region.forEach(cell => {
+                                this.territories[cell.y][cell.x] = owner;
+                            });
+                            
+                            // 更新分数
+                            this.players[owner].score += region.length;
+                            
+                            console.log(`玩家 ${this.players[owner].name} 获得领地，大小: ${region.length}, 新得分: ${this.players[owner].score}`);
+                        }
+                    }
+                }
+            }
+        }
+        
+        this.updateTerritoriesDisplay();
+        this.updateUI();
     }
 
-    bindButtonEvents() {
-        // 菜单按钮
-        const menuBtn = document.getElementById('menu-btn');
-        if (menuBtn) {
-            menuBtn.addEventListener('click', (e) => {
-                console.log('菜单按钮被点击');
-                e.preventDefault();
-                e.stopPropagation();
-                this.showPauseMenu();
-            });
+    bfsRegion(startX, startY, visited) {
+        const region = [];
+        const queue = [{x: startX, y: startY}];
+        visited[startY][startX] = true;
+        
+        while (queue.length > 0) {
+            const {x, y} = queue.shift();
+            region.push({x, y});
+            
+            const directions = [
+                {dx: 0, dy: -1}, // 上
+                {dx: 0, dy: 1},  // 下
+                {dx: -1, dy: 0}, // 左
+                {dx: 1, dy: 0}   // 右
+            ];
+            
+            for (const dir of directions) {
+                const newX = x + dir.dx;
+                const newY = y + dir.dy;
+                
+                if (newX >= 0 && newX < this.boardSize && 
+                    newY >= 0 && newY < this.boardSize && 
+                    !visited[newY][newX] &&
+                    !this.isWallBetween(x, y, newX, newY)) {
+                    visited[newY][newX] = true;
+                    queue.push({x: newX, y: newY});
+                }
+            }
         }
+        
+        return region;
+    }
 
-        // 重新开始按钮
-        const restartBtn = document.getElementById('restart-btn');
-        if (restartBtn) {
-            restartBtn.addEventListener('click', (e) => {
-                console.log('重新开始按钮被点击');
-                e.preventDefault();
-                e.stopPropagation();
-                this.restartGame();
-            });
-        }
-
-        // 悔棋按钮
-        const undoBtn = document.getElementById('undo-btn');
-        if (undoBtn) {
-            undoBtn.addEventListener('click', (e) => {
-                console.log('悔棋按钮被点击');
-                e.preventDefault();
-                e.stopPropagation();
-                this.undoMove();
-            });
-        }
-
-        // 更换棋子按钮
-        const changePieceBtn = document.getElementById('change-piece-btn');
-        if (changePieceBtn) {
-            changePieceBtn.addEventListener('click', (e) => {
-                console.log('更换棋子按钮被点击');
-                e.preventDefault();
-                e.stopPropagation();
-                this.changePiece();
-            });
-        }
-
-        // 跳过回合按钮
-        const passTurnBtn = document.getElementById('pass-turn-btn');
-        if (passTurnBtn) {
-            passTurnBtn.addEventListener('click', (e) => {
-                console.log('跳过回合按钮被点击');
-                e.preventDefault();
-                e.stopPropagation();
-                this.passTurn();
-            });
-        }
-
-        // 暂停按钮
-        const pauseBtn = document.getElementById('pause-btn');
-        if (pauseBtn) {
-            pauseBtn.addEventListener('click', (e) => {
-                console.log('暂停按钮被点击');
-                e.preventDefault();
-                e.stopPropagation();
-                this.showPauseMenu();
-            });
-        }
-
-        // 提示按钮
-        const hintBtn = document.getElementById('hint-btn');
-        if (hintBtn) {
-            hintBtn.addEventListener('click', (e) => {
-                console.log('提示按钮被点击');
-                e.preventDefault();
-                e.stopPropagation();
-                this.showHints();
-            });
+    isWallBetween(x1, y1, x2, y2) {
+        if (x1 === x2) {
+            // 垂直移动 - 检查水平围墙
+            const wallY = Math.min(y1, y2) + 1;
+            return this.horizontalWalls[wallY] && this.horizontalWalls[wallY][x1];
+        } else {
+            // 水平移动 - 检查垂直围墙
+            const wallX = Math.min(x1, x2) + 1;
+            return this.verticalWalls[wallX] && this.verticalWalls[wallX][y1];
         }
     }
 
-    bindModalEvents() {
-        // 暂停菜单按钮
-        const resumeBtn = document.getElementById('resume-btn');
-        if (resumeBtn) {
-            resumeBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                this.hidePauseMenu();
-            });
+    isRegionEnclosed(region) {
+        for (const cell of region) {
+            const {x, y} = cell;
+            
+            const directions = [
+                {dx: 0, dy: -1}, // 上
+                {dx: 0, dy: 1},  // 下
+                {dx: -1, dy: 0}, // 左
+                {dx: 1, dy: 0}   // 右
+            ];
+            
+            for (const dir of directions) {
+                const newX = x + dir.dx;
+                const newY = y + dir.dy;
+                
+                // 如果相邻格子在棋盘外，说明有边界围墙
+                if (newX < 0 || newX >= this.boardSize || 
+                    newY < 0 || newY >= this.boardSize) {
+                    continue;
+                }
+                
+                // 如果相邻格子不在区域内且没有围墙阻挡，说明区域未完全包围
+                if (!region.some(c => c.x === newX && c.y === newY) && 
+                    !this.isWallBetween(x, y, newX, newY)) {
+                    return false;
+                }
+            }
         }
+        
+        return true;
+    }
 
-        const restartModalBtn = document.getElementById('restart-modal-btn');
-        if (restartModalBtn) {
-            restartModalBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                this.restartGame();
-            });
+    getRegionOwner(region) {
+        let playerPieces = Array(this.players.length).fill(0);
+        
+        for (const cell of region) {
+            const {x, y} = cell;
+            const cellOwner = this.cells[y][x];
+            
+            if (cellOwner !== null) {
+                playerPieces[cellOwner]++;
+            }
         }
+        
+        // 找出有棋子的玩家
+        const playersWithPieces = playerPieces
+            .map((count, playerId) => ({ playerId, count }))
+            .filter(item => item.count > 0);
+        
+        // 如果区域内只有一种颜色的棋子，返回该玩家
+        if (playersWithPieces.length === 1) {
+            return playersWithPieces[0].playerId;
+        }
+        
+        // 如果区域内有多种颜色的棋子或没有棋子，返回null
+        return null;
+    }
 
-        const menuModalBtn = document.getElementById('menu-modal-btn');
-        if (menuModalBtn) {
-            menuModalBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                this.returnToMenu();
-            });
-        }
+    updateTerritoriesDisplay() {
+        const cells = document.querySelectorAll('.cell');
+        cells.forEach(cell => {
+            const x = parseInt(cell.dataset.x);
+            const y = parseInt(cell.dataset.y);
+            const territoryOwner = this.territories[y][x];
+            
+            // 移除所有领地类
+            cell.classList.remove('territory-player1', 'territory-player2', 'territory-player3', 'territory-player4');
+            
+            // 添加对应的领地类
+            if (territoryOwner !== null) {
+                cell.classList.add(`territory-${this.players[territoryOwner].color}`);
+            }
+        });
+    }
 
-        const settingsModalBtn = document.getElementById('settings-modal-btn');
-        if (settingsModalBtn) {
-            settingsModalBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                this.showSettings();
-            });
-        }
-
-        // 游戏结束按钮
-        const playAgainBtn = document.getElementById('play-again-btn');
-        if (playAgainBtn) {
-            playAgainBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                this.restartGame();
-            });
-        }
-
-        const backToMenuBtn = document.getElementById('back-to-menu-btn');
-        if (backToMenuBtn) {
-            backToMenuBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                this.returnToMenu();
-            });
-        }
-
-        const reviewGameBtn = document.getElementById('review-game-btn');
-        if (reviewGameBtn) {
-            reviewGameBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                this.reviewGame();
-            });
-        }
+    // 检查棋子是否被困在领地内
+    isPieceTrapped(x, y) {
+        return this.territories[y][x] !== null;
     }
 
     handleCellClick(x, y) {
@@ -351,7 +404,8 @@ class WallGame {
             isAI: this.isCurrentPlayerAI(),
             phase: this.phase,
             selectedPiece: this.selectedPiece,
-            hasMoved: this.hasMoved
+            hasMoved: this.hasMoved,
+            isTrapped: this.isPieceTrapped(x, y)
         });
         
         if (this.gameOver) {
@@ -361,6 +415,12 @@ class WallGame {
         
         if (this.isCurrentPlayerAI()) {
             console.log('AI回合，忽略点击');
+            return;
+        }
+
+        // 检查棋子是否被困
+        if (this.phase === 'movement' && this.cells[y][x] === this.currentPlayer && this.isPieceTrapped(x, y)) {
+            this.showMessage('这个棋子在领地内，无法移动！');
             return;
         }
 
@@ -526,7 +586,7 @@ class WallGame {
         const gameBoard = document.getElementById('game-board');
         if (!gameBoard) return;
 
-        const boardSizePx = 400;
+        const boardSizePx = parseInt(gameBoard.style.width);
         const cellSize = boardSizePx / this.boardSize;
         const options = [];
         const fragment = document.createDocumentFragment();
@@ -603,8 +663,21 @@ class WallGame {
                     border: 3px solid white;
                     left: ${option.left}px;
                     top: ${option.top}px;
+                    touch-action: manipulation;
                 `;
 
+                // 移动端触摸事件
+                wallOption.addEventListener('touchstart', (e) => {
+                    e.stopPropagation();
+                }, { passive: true });
+
+                wallOption.addEventListener('touchend', (e) => {
+                    e.stopPropagation();
+                    console.log(`选择围墙选项 ${option.number}`);
+                    this.placeWall(option.wallX, option.wallY, option.orientation);
+                }, { passive: true });
+
+                // 桌面端点击事件
                 wallOption.addEventListener('click', (e) => {
                     e.stopPropagation();
                     console.log(`选择围墙选项 ${option.number}`);
@@ -651,10 +724,8 @@ class WallGame {
         // 放置围墙
         if (orientation === 'horizontal') {
             this.horizontalWalls[y][x] = true;
-            console.log(`设置水平围墙[${y}][${x}] = true`);
         } else {
             this.verticalWalls[x][y] = true;
-            console.log(`设置垂直围墙[${x}][${y}] = true`);
         }
 
         // 减少围墙数量
@@ -688,62 +759,158 @@ class WallGame {
 
     canPlaceWall(x, y, orientation) {
         if (orientation === 'horizontal') {
-            // 检查水平围墙
             if (y <= 0 || y >= this.horizontalWalls.length) return false;
             if (x < 0 || x >= this.horizontalWalls[y].length) return false;
-            
-            // 检查是否已有围墙
-            if (this.horizontalWalls[y][x]) {
-                console.log(`位置 (${x}, ${y}) 已有水平围墙`);
-                return false;
-            }
-            
-            return true;
+            return !this.horizontalWalls[y][x];
         } else {
-            // 检查垂直围墙
             if (x <= 0 || x >= this.verticalWalls.length) return false;
             if (y < 0 || y >= this.verticalWalls[x].length) return false;
-            
-            // 检查是否已有围墙
-            if (this.verticalWalls[x][y]) {
-                console.log(`位置 (${x}, ${y}) 已有垂直围墙`);
-                return false;
-            }
-            
-            return true;
+            return !this.verticalWalls[x][y];
         }
     }
 
-    detectTerritories() {
-        console.log('检测领地...');
-        // 简化领地检测
-        this.players.forEach(player => {
-            player.score = player.pieces.length * 2; // 临时计分
-        });
-        this.updateUI();
+    bindEvents() {
+        console.log('开始绑定事件...');
+        this.bindButtonEvents();
+        this.bindModalEvents();
     }
 
-    checkGameEnd() {
-        // 简化游戏结束检查
-        let canMove = false;
-        for (const player of this.players) {
-            if (player.pieces.length > 0) {
-                canMove = true;
-                break;
-            }
+    bindButtonEvents() {
+        // 菜单按钮
+        const menuBtn = document.getElementById('menu-btn');
+        if (menuBtn) {
+            menuBtn.addEventListener('click', (e) => {
+                console.log('菜单按钮被点击');
+                e.preventDefault();
+                e.stopPropagation();
+                this.showPauseMenu();
+            });
         }
-        
-        if (!canMove) {
-            this.gameOver = true;
-            this.showGameOverModal();
+
+        // 重新开始按钮
+        const restartBtn = document.getElementById('restart-btn');
+        if (restartBtn) {
+            restartBtn.addEventListener('click', (e) => {
+                console.log('重新开始按钮被点击');
+                e.preventDefault();
+                e.stopPropagation();
+                this.restartGame();
+            });
+        }
+
+        // 悔棋按钮
+        const undoBtn = document.getElementById('undo-btn');
+        if (undoBtn) {
+            undoBtn.addEventListener('click', (e) => {
+                console.log('悔棋按钮被点击');
+                e.preventDefault();
+                e.stopPropagation();
+                this.undoMove();
+            });
+        }
+
+        // 更换棋子按钮
+        const changePieceBtn = document.getElementById('change-piece-btn');
+        if (changePieceBtn) {
+            changePieceBtn.addEventListener('click', (e) => {
+                console.log('更换棋子按钮被点击');
+                e.preventDefault();
+                e.stopPropagation();
+                this.changePiece();
+            });
+        }
+
+        // 跳过回合按钮
+        const passTurnBtn = document.getElementById('pass-turn-btn');
+        if (passTurnBtn) {
+            passTurnBtn.addEventListener('click', (e) => {
+                console.log('跳过回合按钮被点击');
+                e.preventDefault();
+                e.stopPropagation();
+                this.passTurn();
+            });
+        }
+
+        // 暂停按钮
+        const pauseBtn = document.getElementById('pause-btn');
+        if (pauseBtn) {
+            pauseBtn.addEventListener('click', (e) => {
+                console.log('暂停按钮被点击');
+                e.preventDefault();
+                e.stopPropagation();
+                this.showPauseMenu();
+            });
+        }
+
+        // 提示按钮
+        const hintBtn = document.getElementById('hint-btn');
+        if (hintBtn) {
+            hintBtn.addEventListener('click', (e) => {
+                console.log('提示按钮被点击');
+                e.preventDefault();
+                e.stopPropagation();
+                this.showHints();
+            });
         }
     }
 
-    showGameOverModal() {
-        console.log('显示游戏结束弹窗');
-        const modal = document.getElementById('game-over-modal');
-        if (modal) {
-            modal.classList.add('show');
+    bindModalEvents() {
+        // 暂停菜单按钮
+        const resumeBtn = document.getElementById('resume-btn');
+        if (resumeBtn) {
+            resumeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.hidePauseMenu();
+            });
+        }
+
+        const restartModalBtn = document.getElementById('restart-modal-btn');
+        if (restartModalBtn) {
+            restartModalBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.restartGame();
+            });
+        }
+
+        const menuModalBtn = document.getElementById('menu-modal-btn');
+        if (menuModalBtn) {
+            menuModalBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.returnToMenu();
+            });
+        }
+
+        const settingsModalBtn = document.getElementById('settings-modal-btn');
+        if (settingsModalBtn) {
+            settingsModalBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.showSettings();
+            });
+        }
+
+        // 游戏结束按钮
+        const playAgainBtn = document.getElementById('play-again-btn');
+        if (playAgainBtn) {
+            playAgainBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.restartGame();
+            });
+        }
+
+        const backToMenuBtn = document.getElementById('back-to-menu-btn');
+        if (backToMenuBtn) {
+            backToMenuBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.returnToMenu();
+            });
+        }
+
+        const reviewGameBtn = document.getElementById('review-game-btn');
+        if (reviewGameBtn) {
+            reviewGameBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.reviewGame();
+            });
         }
     }
 
@@ -784,7 +951,7 @@ class WallGame {
                 } else if (move.type === 'movement') {
                     // AI移动棋子
                     this.selectPieceForAI(move.fromX, move.fromY);
-                    await Utils.wait(500); // 等待一下让玩家看到选择
+                    await Utils.wait(500);
                     this.movePieceForAI(move.toX, move.toY);
                     
                     // AI放置围墙
@@ -870,7 +1037,6 @@ class WallGame {
         this.addGameLog(`${currentPlayer.name} 移动了棋子`);
     }
 
-    // 其他必要的方法...
     isValidMove(fromX, fromY, toX, toY) {
         if (toX < 0 || toX >= this.boardSize || toY < 0 || toY >= this.boardSize) {
             return false;
@@ -883,12 +1049,21 @@ class WallGame {
         const dy = Math.abs(toY - fromY);
         
         if ((dx === 1 && dy === 0) || (dx === 0 && dy === 1)) {
+            if (dx === 1) {
+                const wallX = Math.min(fromX, toX) + 1;
+                const wallY = fromY;
+                if (this.verticalWalls[wallX] && this.verticalWalls[wallX][wallY]) {
+                    return false;
+                }
+            } else {
+                const wallX = fromX;
+                const wallY = Math.min(fromY, toY) + 1;
+                if (this.horizontalWalls[wallY] && this.horizontalWalls[wallY][wallX]) {
+                    return false;
+                }
+            }
             return true;
         }
-        return false;
-    }
-
-    isPieceTrapped(x, y) {
         return false;
     }
 
@@ -917,6 +1092,113 @@ class WallGame {
         }
     }
 
+    checkGameEnd() {
+        // 检查是否所有玩家都无法移动
+        let canAnyPlayerMove = false;
+        
+        for (const player of this.players) {
+            for (const piece of player.pieces) {
+                if (!this.isPieceTrapped(piece.x, piece.y)) {
+                    const validMoves = this.getValidPieceMoves(piece.x, piece.y);
+                    if (validMoves.length > 0) {
+                        canAnyPlayerMove = true;
+                        break;
+                    }
+                }
+            }
+            if (canAnyPlayerMove) break;
+        }
+        
+        if (!canAnyPlayerMove) {
+            this.gameOver = true;
+            this.endGame();
+        }
+    }
+
+    getValidPieceMoves(x, y) {
+        const moves = [];
+        const directions = [
+            { dx: 0, dy: -1 },
+            { dx: 0, dy: 1 },
+            { dx: -1, dy: 0 },
+            { dx: 1, dy: 0 }
+        ];
+        
+        for (const dir of directions) {
+            const newX = x + dir.dx;
+            const newY = y + dir.dy;
+            if (this.isValidMove(x, y, newX, newY)) {
+                moves.push({ x: newX, y: newY });
+            }
+        }
+        
+        return moves;
+    }
+
+    endGame() {
+        console.log('游戏结束！');
+        
+        // 确定获胜者
+        let maxScore = -1;
+        let winners = [];
+        
+        this.players.forEach(player => {
+            if (player.score > maxScore) {
+                maxScore = player.score;
+                winners = [player];
+            } else if (player.score === maxScore) {
+                winners.push(player);
+            }
+        });
+        
+        this.showGameOverModal(winners, maxScore);
+        this.addGameLog('游戏结束！');
+    }
+
+    showGameOverModal(winners, winningScore) {
+        const modal = document.getElementById('game-over-modal');
+        const resultSummary = document.getElementById('result-summary');
+        const scoreBoard = document.getElementById('final-score-board');
+        
+        if (!modal) return;
+        
+        // 更新结果摘要
+        if (winners.length === 1) {
+            resultSummary.innerHTML = `
+                <h3>🎉 游戏结束！</h3>
+                <p>${winners[0].name} 获胜！</p>
+                <p>得分: ${winningScore}</p>
+            `;
+        } else {
+            const winnerNames = winners.map(w => w.name).join('、');
+            resultSummary.innerHTML = `
+                <h3>🎉 游戏结束！</h3>
+                <p>平局！${winnerNames} 共同获胜！</p>
+                <p>得分: ${winningScore}</p>
+            `;
+        }
+        
+        // 更新得分板
+        scoreBoard.innerHTML = '';
+        this.players
+            .sort((a, b) => b.score - a.score)
+            .forEach(player => {
+                const isWinner = winners.some(winner => winner.id === player.id);
+                const scoreItem = document.createElement('div');
+                scoreItem.className = `score-item ${isWinner ? 'winner' : ''}`;
+                scoreItem.innerHTML = `
+                    <div class="score-player">
+                        <div class="score-player-color" style="background: var(--${player.color}-color)"></div>
+                        <span class="score-player-name">${player.name}</span>
+                    </div>
+                    <div class="score-value">${player.score}</div>
+                `;
+                scoreBoard.appendChild(scoreItem);
+            });
+        
+        modal.classList.add('show');
+    }
+
     isCurrentPlayerAI() {
         const currentPlayer = this.players[this.currentPlayer];
         return currentPlayer.type.startsWith('ai-');
@@ -929,13 +1211,14 @@ class WallGame {
             verticalWalls: JSON.parse(JSON.stringify(this.verticalWalls)),
             players: JSON.parse(JSON.stringify(this.players)),
             currentPlayer: this.currentPlayer,
-            phase: this.phase
+            phase: this.phase,
+            territories: JSON.parse(JSON.stringify(this.territories))
         });
     }
 
     undoMove() {
         console.log('悔棋');
-        if (this.history.length > 1) {
+        if (this.history.length > 1 && this.config.allowUndo) {
             this.history.pop();
             const state = this.history.pop();
             this.cells = state.cells;
@@ -944,6 +1227,7 @@ class WallGame {
             this.players = state.players;
             this.currentPlayer = state.currentPlayer;
             this.phase = state.phase;
+            this.territories = state.territories;
             this.recreateBoard();
             this.updateUI();
         }
@@ -1021,7 +1305,7 @@ class WallGame {
         
         const logEntry = document.createElement('div');
         logEntry.className = 'log-entry';
-        logEntry.textContent = message;
+        logEntry.textContent = `[${Utils.formatTime(0)}] ${message}`;
         
         logContent.appendChild(logEntry);
         logContent.scrollTop = logContent.scrollHeight;
@@ -1061,8 +1345,79 @@ class WallGame {
         if (turnCount) {
             turnCount.textContent = this.turnCount;
         }
+
+        // 更新控制按钮状态
+        const changePieceBtn = document.getElementById('change-piece-btn');
+        const undoBtn = document.getElementById('undo-btn');
+        
+        if (changePieceBtn) {
+            changePieceBtn.disabled = this.phase !== 'movement' || this.hasMoved || this.selectedPiece === null;
+        }
+        
+        if (undoBtn) {
+            undoBtn.disabled = this.history.length < 2 || !this.config.allowUndo || this.isCurrentPlayerAI();
+        }
     }
 }
+
+// 添加领地样式
+const territoryStyles = `
+.cell.territory-player1 { background-color: rgba(255, 107, 107, 0.2) !important; }
+.cell.territory-player2 { background-color: rgba(78, 205, 196, 0.2) !important; }
+.cell.territory-player3 { background-color: rgba(255, 234, 167, 0.2) !important; }
+.cell.territory-player4 { background-color: rgba(162, 155, 254, 0.2) !important; }
+
+/* 移动端优化 */
+@media (max-width: 768px) {
+    .game-board {
+        width: 100% !important;
+        max-width: 400px;
+        height: auto !important;
+        aspect-ratio: 1 / 1;
+    }
+    
+    .wall-option {
+        width: 40px !important;
+        height: 40px !important;
+        font-size: 16px !important;
+    }
+    
+    .header-btn, .control-btn {
+        padding: 12px 16px !important;
+        font-size: 14px !important;
+    }
+    
+    .player-info {
+        padding: 12px !important;
+    }
+    
+    .player-stats {
+        grid-template-columns: 1fr !important;
+    }
+}
+
+/* 防止移动端缩放 */
+@media (max-width: 768px) {
+    .game-container {
+        -webkit-text-size-adjust: 100%;
+    }
+    
+    .game-main {
+        grid-template-columns: 1fr !important;
+        gap: 16px !important;
+        padding: 16px !important;
+    }
+    
+    .info-section {
+        order: -1;
+    }
+}
+`;
+
+// 添加样式到页面
+const styleSheet = document.createElement('style');
+styleSheet.textContent = territoryStyles;
+document.head.appendChild(styleSheet);
 
 // 游戏初始化
 document.addEventListener('DOMContentLoaded', () => {
