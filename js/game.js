@@ -40,7 +40,7 @@ class WallGame {
             pieces: [],
             walls: this.config.maxWalls,
             score: 0,
-            surrendered: false  // 添加投降状态
+            surrendered: false
         }));
     }
 
@@ -977,6 +977,148 @@ class WallGame {
         }
     }
 
+    // 回顾游戏功能
+    reviewGame() {
+        console.log('回顾游戏');
+        
+        // 创建游戏回顾内容
+        const reviewContent = this.createGameReview();
+        this.showReviewModal(reviewContent);
+    }
+
+    createGameReview() {
+        let review = '<h4>🎮 游戏回顾</h4>';
+        review += `<p><strong>游戏模式:</strong> ${this.config.mode === 'single' ? '单人游戏' : '多人游戏'}</p>`;
+        review += `<p><strong>棋盘大小:</strong> ${this.boardSize}×${this.boardSize}</p>`;
+        review += `<p><strong>总回合数:</strong> ${this.turnCount}</p>`;
+        review += `<p><strong>游戏阶段:</strong> ${this.phase === 'placement' ? '放置阶段' : '移动阶段'}</p>`;
+        
+        review += '<h5>👥 玩家表现:</h5>';
+        
+        this.players.forEach((player, index) => {
+            const status = player.surrendered ? '🏳️ 已投降' : '🎯 游戏中';
+            review += `<div class="review-player">
+                <strong>${player.name}</strong> - 
+                得分: ${player.score} | 
+                棋子: ${player.pieces.length}/4 | 
+                围墙: ${player.walls} |
+                ${status}
+            </div>`;
+        });
+        
+        review += '<h5>📊 关键事件:</h5>';
+        const logContent = document.getElementById('game-log');
+        if (logContent) {
+            const logEntries = logContent.querySelectorAll('.log-entry');
+            const keyEvents = Array.from(logEntries)
+                .filter(entry => {
+                    const text = entry.textContent;
+                    return text.includes('获得领地') || 
+                           text.includes('投降') || 
+                           text.includes('游戏结束') ||
+                           text.includes('放置了围墙') ||
+                           text.includes('移动了棋子');
+                })
+                .slice(-8); // 只显示最后8个关键事件
+            
+            if (keyEvents.length > 0) {
+                keyEvents.forEach(entry => {
+                    review += `<div class="review-event">${entry.textContent}</div>`;
+                });
+            } else {
+                review += '<p>暂无关键事件记录</p>';
+            }
+        }
+        
+        return review;
+    }
+
+    showReviewModal(content) {
+        // 创建回顾模态框
+        const modal = document.createElement('div');
+        modal.className = 'modal show';
+        modal.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+        `;
+        
+        modal.innerHTML = `
+            <div class="modal-content" style="
+                background: linear-gradient(135deg, var(--dark-color), var(--darker-color));
+                padding: 24px;
+                border-radius: 12px;
+                max-width: 600px;
+                max-height: 80vh;
+                overflow-y: auto;
+                color: white;
+                border: 1px solid rgba(255,255,255,0.1);
+            ">
+                <div class="modal-header" style="
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-bottom: 20px;
+                    border-bottom: 1px solid rgba(255,255,255,0.1);
+                    padding-bottom: 12px;
+                ">
+                    <h3 style="margin: 0; color: var(--light-color);">📊 游戏回顾</h3>
+                    <button class="close-review-btn" style="
+                        background: none;
+                        border: none;
+                        color: var(--gray-color);
+                        font-size: 1.5rem;
+                        cursor: pointer;
+                        padding: 4px;
+                        border-radius: 4px;
+                    ">&times;</button>
+                </div>
+                <div class="modal-body" style="line-height: 1.5;">
+                    ${content}
+                </div>
+                <div class="modal-footer" style="
+                    margin-top: 20px;
+                    text-align: center;
+                    border-top: 1px solid rgba(255,255,255,0.1);
+                    padding-top: 12px;
+                ">
+                    <button class="btn btn-primary" id="close-review" style="
+                        padding: 10px 20px;
+                        background: var(--primary-color);
+                        border: none;
+                        border-radius: 6px;
+                        color: white;
+                        cursor: pointer;
+                        font-weight: 600;
+                    ">关闭</button>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+        
+        // 绑定关闭事件
+        const closeBtn = modal.querySelector('.close-review-btn');
+        const closeReviewBtn = modal.querySelector('#close-review');
+        
+        const closeModal = () => {
+            document.body.removeChild(modal);
+        };
+        
+        closeBtn.addEventListener('click', closeModal);
+        closeReviewBtn.addEventListener('click', closeModal);
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) closeModal();
+        });
+    }
+
     async makeAIMove() {
         console.log('AI开始思考...');
         const aiPlayer = this.aiPlayers.get(this.currentPlayer);
@@ -1236,8 +1378,50 @@ class WallGame {
             }
         });
         
+        // 更新游戏统计
+        this.updateGameStatistics(winners);
+        
         this.showGameOverModal(winners, maxScore);
         this.addGameLog('游戏结束！');
+    }
+
+    // 更新游戏统计信息
+    updateGameStatistics(winners) {
+        try {
+            // 获取当前统计
+            const stats = settingsManager.settings;
+            
+            // 增加游戏次数
+            stats.gamesPlayed = (stats.gamesPlayed || 0) + 1;
+            
+            // 检查当前玩家是否获胜（人类玩家）
+            const isHumanPlayerWinner = winners.some(winner => 
+                winner.type === 'human' || !winner.type.startsWith('ai-')
+            );
+            
+            if (isHumanPlayerWinner) {
+                stats.gamesWon = (stats.gamesWon || 0) + 1;
+            }
+            
+            // 更新最高得分
+            const maxScore = Math.max(...this.players.map(p => p.score));
+            if (maxScore > (stats.bestScore || 0)) {
+                stats.bestScore = maxScore;
+            }
+            
+            // 保存统计
+            settingsManager.saveSettings();
+            
+            console.log('统计信息已更新:', {
+                gamesPlayed: stats.gamesPlayed,
+                gamesWon: stats.gamesWon,
+                bestScore: stats.bestScore,
+                winRate: settingsManager.getWinRate()
+            });
+            
+        } catch (error) {
+            console.error('更新统计信息时出错:', error);
+        }
     }
 
     showGameOverModal(winners, winningScore) {
