@@ -785,3 +785,44 @@
         order: 1;
     }
 }
+
+/* 游戏回顾样式 */
+.review-player {
+    padding: 10px 12px;
+    margin: 6px 0;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    border-left: 4px solid;
+    font-size: 0.9rem;
+}
+
+.review-player:nth-child(1) { border-left-color: var(--player1-color); }
+.review-player:nth-child(2) { border-left-color: var(--player2-color); }
+.review-player:nth-child(3) { border-left-color: var(--player3-color); }
+.review-player:nth-child(4) { border-left-color: var(--player4-color); }
+
+.review-event {
+    padding: 8px 10px;
+    margin: 5px 0;
+    background: rgba(52, 152, 219, 0.2);
+    border-radius: 6px;
+    font-size: 0.85rem;
+    border-left: 3px solid #3498db;
+}
+
+/* 投降玩家样式 */
+.score-item.surrendered {
+    opacity: 0.6;
+    background: rgba(231, 76, 60, 0.1);
+}
+
+/* 制作人员样式更新 */
+.credits-section h4 {
+    color: var(--primary-color);
+    margin-bottom: 8px;
+}
+
+.credits-section p {
+    color: var(--light-color);
+    margin-bottom: 12px;
+}
