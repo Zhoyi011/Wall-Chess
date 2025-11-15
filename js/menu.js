@@ -1,3 +1,4 @@
+
 // 菜单管理器
 class MenuManager {
     constructor() {
@@ -99,6 +100,11 @@ class MenuManager {
             
             // 播放音效
             soundManager.play('click');
+            
+            // 如果是多人游戏模态框，初始化玩家配置
+            if (modalId === 'multi-player-modal') {
+                this.updatePlayerConfigs(this.selectedPlayers);
+            }
         }
     }
 
@@ -163,13 +169,28 @@ class MenuManager {
     createPlayerConfigElement(config, index) {
         const div = document.createElement('div');
         div.className = 'player-config-item';
+        div.style.cssText = `
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: var(--border-radius-sm);
+            margin-bottom: 8px;
+        `;
         div.innerHTML = `
-            <div class="config-header">
-                <div class="player-color" style="background: var(--${config.color}-color)"></div>
-                <span class="player-name">${config.name}</span>
+            <div class="config-header" style="display: flex; align-items: center; gap: 12px;">
+                <div class="player-color" style="width: 20px; height: 20px; border-radius: 50%; background: var(--${config.color}-color)"></div>
+                <span class="player-name" style="color: var(--light-color); font-weight: 600;">${config.name}</span>
             </div>
             <div class="config-controls">
-                <select class="player-type-select" data-index="${index}">
+                <select class="player-type-select" data-index="${index}" style="
+                    background: rgba(255, 255, 255, 0.1);
+                    border: 1px solid rgba(255, 255, 255, 0.2);
+                    border-radius: var(--border-radius-sm);
+                    color: var(--light-color);
+                    padding: 6px 12px;
+                ">
                     <option value="human" ${config.type === 'human' ? 'selected' : ''}>人类</option>
                     <option value="ai-easy" ${config.type === 'ai-easy' ? 'selected' : ''}>AI - 简单</option>
                     <option value="ai-medium" ${config.type === 'ai-medium' ? 'selected' : ''}>AI - 中等</option>
@@ -193,8 +214,10 @@ class MenuManager {
     }
 
     startSinglePlayerGame() {
-        const boardSize = parseInt(document.getElementById('board-size').value);
-        const wallCount = parseInt(document.getElementById('wall-count').value);
+        console.log('开始单人游戏...');
+        
+        const boardSize = parseInt(document.getElementById('board-size')?.value || 9);
+        const wallCount = parseInt(document.getElementById('wall-count')?.value || 15);
 
         const gameConfig = settingsManager.getGameConfig('single', 2, this.selectedDifficulty);
         gameConfig.boardSize = boardSize;
@@ -206,70 +229,141 @@ class MenuManager {
             { id: 1, name: 'AI对手', type: `ai-${this.selectedDifficulty}`, color: 'player2' }
         ];
 
+        console.log('游戏配置:', gameConfig);
         this.startGame(gameConfig);
     }
 
     startMultiPlayerGame() {
-        const boardSize = parseInt(document.getElementById('mp-board-size').value);
-        const wallCount = parseInt(document.getElementById('mp-wall-count').value);
+        console.log('开始多人游戏...');
+        
+        const boardSize = parseInt(document.getElementById('mp-board-size')?.value || 9);
+        const wallCount = parseInt(document.getElementById('mp-wall-count')?.value || 15);
 
         const gameConfig = settingsManager.getGameConfig('multi', this.selectedPlayers);
         gameConfig.boardSize = boardSize;
         gameConfig.maxWalls = wallCount;
         gameConfig.playerConfigs = this.playerConfigs.slice(0, this.selectedPlayers);
 
+        console.log('多人游戏配置:', gameConfig);
         this.startGame(gameConfig);
     }
 
     startGame(gameConfig) {
-        // 保存游戏配置到本地存储
-        Utils.storage.set('currentGameConfig', gameConfig);
-        
-        // 播放开始音效
-        soundManager.play('start');
-        
-        // 跳转到游戏页面
-        setTimeout(() => {
-            window.location.href = 'game.html';
-        }, 500);
+        try {
+            // 验证游戏配置
+            if (!gameConfig || !gameConfig.playerConfigs || gameConfig.playerConfigs.length === 0) {
+                console.error('无效的游戏配置:', gameConfig);
+                this.showError('游戏配置无效，请重试');
+                return;
+            }
+
+            // 保存游戏配置到本地存储
+            const success = Utils.storage.set('currentGameConfig', gameConfig);
+            if (!success) {
+                console.error('保存游戏配置失败');
+                this.showError('保存游戏配置失败，请检查浏览器设置');
+                return;
+            }
+
+            console.log('游戏配置已保存，准备跳转...');
+            
+            // 播放开始音效
+            soundManager.play('start');
+            
+            // 隐藏模态框
+            this.hideModal();
+            
+            // 跳转到游戏页面
+            setTimeout(() => {
+                console.log('正在跳转到游戏页面...');
+                window.location.href = 'game.html';
+            }, 500);
+            
+        } catch (error) {
+            console.error('启动游戏时出错:', error);
+            this.showError('启动游戏时出错: ' + error.message);
+        }
     }
 
     saveSettings() {
-        // 获取所有设置值
-        const soundEnabled = document.getElementById('sound-enabled').checked;
-        const animationsEnabled = document.getElementById('animations-enabled').checked;
-        const theme = document.getElementById('theme-select').value;
-        const undoEnabled = document.getElementById('undo-enabled').checked;
-        const hintsEnabled = document.getElementById('hints-enabled').checked;
-        const maxUndo = parseInt(document.getElementById('max-undo').value);
+        try {
+            // 获取所有设置值
+            const soundEnabled = document.getElementById('sound-enabled')?.checked || true;
+            const animationsEnabled = document.getElementById('animations-enabled')?.checked || true;
+            const theme = document.getElementById('theme-select')?.value || 'default';
+            const undoEnabled = document.getElementById('undo-enabled')?.checked || true;
+            const hintsEnabled = document.getElementById('hints-enabled')?.checked || false;
+            const maxUndo = parseInt(document.getElementById('max-undo')?.value || 10);
 
-        // 更新设置
-        settingsManager.updateSetting('soundEnabled', soundEnabled);
-        settingsManager.updateSetting('animationsEnabled', animationsEnabled);
-        settingsManager.updateSetting('theme', theme);
-        settingsManager.updateSetting('allowUndo', undoEnabled);
-        settingsManager.updateSetting('showHints', hintsEnabled);
-        settingsManager.updateSetting('maxUndoSteps', maxUndo);
+            // 更新设置
+            settingsManager.updateSetting('soundEnabled', soundEnabled);
+            settingsManager.updateSetting('animationsEnabled', animationsEnabled);
+            settingsManager.updateSetting('theme', theme);
+            settingsManager.updateSetting('allowUndo', undoEnabled);
+            settingsManager.updateSetting('showHints', hintsEnabled);
+            settingsManager.updateSetting('maxUndoSteps', maxUndo);
 
-        // 隐藏模态框
-        this.hideModal();
-        
-        // 播放确认音效
-        soundManager.play('confirm');
+            // 隐藏模态框
+            this.hideModal();
+            
+            // 播放确认音效
+            soundManager.play('confirm');
+            
+            this.showMessage('设置已保存！');
+            
+        } catch (error) {
+            console.error('保存设置时出错:', error);
+            this.showError('保存设置时出错');
+        }
     }
 
     loadStatistics() {
-        const gamesPlayed = settingsManager.settings.gamesPlayed;
-        const bestScore = settingsManager.settings.bestScore;
-        const winRate = settingsManager.getWinRate();
+        try {
+            const gamesPlayed = settingsManager.settings.gamesPlayed || 0;
+            const bestScore = settingsManager.settings.bestScore || 0;
+            const winRate = settingsManager.getWinRate() || 0;
 
-        document.getElementById('games-played').textContent = gamesPlayed;
-        document.getElementById('best-score').textContent = bestScore;
-        document.getElementById('win-rate').textContent = `${winRate}%`;
+            document.getElementById('games-played').textContent = gamesPlayed;
+            document.getElementById('best-score').textContent = bestScore;
+            document.getElementById('win-rate').textContent = `${winRate}%`;
+        } catch (error) {
+            console.error('加载统计信息时出错:', error);
+        }
+    }
+
+    showError(message) {
+        alert('错误: ' + message);
+    }
+
+    showMessage(message) {
+        // 创建临时消息提示
+        const messageDiv = document.createElement('div');
+        messageDiv.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: var(--primary-color);
+            color: white;
+            padding: 12px 20px;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow-lg);
+            z-index: 10000;
+            font-size: 14px;
+        `;
+        messageDiv.textContent = message;
+        
+        document.body.appendChild(messageDiv);
+        
+        setTimeout(() => {
+            if (messageDiv.parentNode) {
+                messageDiv.parentNode.removeChild(messageDiv);
+            }
+        }, 3000);
     }
 }
 
 // 页面加载完成后初始化
 document.addEventListener('DOMContentLoaded', () => {
+    console.log('菜单页面加载完成，初始化菜单管理器...');
     new MenuManager();
 });
