@@ -6,6 +6,7 @@
     <title>围墙争夺战 - 游戏中</title>
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/game.css">
+    <link rel="stylesheet" href="css/pause-menu.css">
 </head>
 <body>
     <div class="game-container">
@@ -210,32 +211,32 @@
         </footer>
     </div>
 
-<!-- 在 game.html 中替换暂停菜单部分 -->
-<div id="pause-modal" class="modal">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h3>游戏暂停</h3>
-        </div>
-        <div class="modal-body">
-            <button class="pause-menu-btn primary" id="resume-btn">
-                <span class="btn-icon">▶️</span>
-                <span class="btn-text">继续游戏</span>
-            </button>
-            <button class="pause-menu-btn secondary" id="restart-modal-btn">
-                <span class="btn-icon">🔄</span>
-                <span class="btn-text">重新开始</span>
-            </button>
-            <button class="pause-menu-btn" id="menu-modal-btn">
-                <span class="btn-icon">🏠</span>
-                <span class="btn-text">返回主菜单</span>
-            </button>
-            <button class="pause-menu-btn accent" id="settings-modal-btn">
-                <span class="btn-icon">⚙️</span>
-                <span class="btn-text">游戏设置</span>
-            </button>
+    <!-- 暂停菜单 -->
+    <div id="pause-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>游戏暂停</h3>
+            </div>
+            <div class="modal-body">
+                <button class="pause-menu-btn primary" id="resume-btn">
+                    <span class="btn-icon">▶️</span>
+                    <span class="btn-text">继续游戏</span>
+                </button>
+                <button class="pause-menu-btn secondary" id="restart-modal-btn">
+                    <span class="btn-icon">🔄</span>
+                    <span class="btn-text">重新开始</span>
+                </button>
+                <button class="pause-menu-btn" id="menu-modal-btn">
+                    <span class="btn-icon">🏠</span>
+                    <span class="btn-text">返回主菜单</span>
+                </button>
+                <button class="pause-menu-btn accent" id="settings-modal-btn">
+                    <span class="btn-icon">⚙️</span>
+                    <span class="btn-text">游戏设置</span>
+                </button>
+            </div>
         </div>
     </div>
-</div>
 
     <!-- 游戏结束弹窗 -->
     <div id="game-over-modal" class="modal">
@@ -287,5 +288,4 @@
     <script src="js/ai.js"></script>
     <script src="js/game.js"></script>
 </body>
-
 </html>
