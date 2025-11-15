@@ -39,7 +39,8 @@ class WallGame {
             color: config.color,
             pieces: [],
             walls: this.config.maxWalls,
-            score: 0
+            score: 0,
+            surrendered: false  // 添加投降状态
         }));
     }
 
@@ -62,6 +63,9 @@ class WallGame {
         this.bindEvents();
         this.updateUI();
         this.addGameLog('游戏开始！');
+        
+        // 保存初始状态
+        this.saveGameState();
         
         // 如果第一个玩家是AI，自动开始
         if (this.isCurrentPlayerAI()) {
@@ -120,6 +124,24 @@ class WallGame {
                 cell.style.userSelect = 'none';
                 cell.style.webkitUserSelect = 'none';
                 cell.style.webkitTapHighlightColor = 'transparent';
+                
+                // 如果有棋子，创建棋子
+                if (this.cells[y][x] !== null) {
+                    const playerId = this.cells[y][x];
+                    const player = this.players[playerId];
+                    const piece = document.createElement('div');
+                    piece.className = `piece ${player.color}`;
+                    piece.style.cssText = `
+                        width: 70%;
+                        height: 70%;
+                        border-radius: 50%;
+                        background: linear-gradient(135deg, var(--${player.color}-color), var(--${player.color}-dark));
+                        box-shadow: 0 3px 6px rgba(0, 0, 0, 0.3);
+                        position: relative;
+                        z-index: 10;
+                    `;
+                    cell.appendChild(piece);
+                }
                 
                 // 绑定触摸和点击事件
                 this.bindCellEvents(cell, x, y);
@@ -422,6 +444,12 @@ class WallGame {
         
         if (this.isCurrentPlayerAI()) {
             console.log('AI回合，忽略点击');
+            return;
+        }
+
+        // 检查当前玩家是否已投降
+        if (this.players[this.currentPlayer].surrendered) {
+            console.log('当前玩家已投降，忽略点击');
             return;
         }
 
@@ -827,14 +855,14 @@ class WallGame {
             });
         }
 
-        // 跳过回合按钮
-        const passTurnBtn = document.getElementById('pass-turn-btn');
-        if (passTurnBtn) {
-            passTurnBtn.addEventListener('click', (e) => {
-                console.log('跳过回合按钮被点击');
+        // 投降按钮
+        const surrenderBtn = document.getElementById('surrender-btn');
+        if (surrenderBtn) {
+            surrenderBtn.addEventListener('click', (e) => {
+                console.log('投降按钮被点击');
                 e.preventDefault();
                 e.stopPropagation();
-                this.passTurn();
+                this.surrender();
             });
         }
 
@@ -918,6 +946,34 @@ class WallGame {
                 e.stopPropagation();
                 this.reviewGame();
             });
+        }
+    }
+
+    // 投降功能
+    surrender() {
+        const currentPlayer = this.players[this.currentPlayer];
+        
+        if (confirm(`确定要投降吗？${currentPlayer.name}将退出游戏。`)) {
+            currentPlayer.surrendered = true;
+            this.addGameLog(`${currentPlayer.name} 投降了！`);
+            
+            // 检查是否所有玩家都投降了
+            const activePlayers = this.players.filter(player => !player.surrendered);
+            
+            if (activePlayers.length <= 1) {
+                // 只有一个玩家或没有玩家了，游戏结束
+                this.gameOver = true;
+                this.endGame();
+            } else {
+                // 继续游戏，跳过投降的玩家
+                this.switchToNextPlayer();
+                this.updateUI();
+                
+                // 如果下一个玩家是AI，自动移动
+                if (this.isCurrentPlayerAI()) {
+                    setTimeout(() => this.makeAIMove(), 500);
+                }
+            }
         }
     }
 
@@ -1075,7 +1131,16 @@ class WallGame {
     }
 
     switchToNextPlayer() {
-        this.currentPlayer = (this.currentPlayer + 1) % this.players.length;
+        let nextPlayer = (this.currentPlayer + 1) % this.players.length;
+        let attempts = 0;
+        
+        // 跳过投降的玩家
+        while (this.players[nextPlayer].surrendered && attempts < this.players.length) {
+            nextPlayer = (nextPlayer + 1) % this.players.length;
+            attempts++;
+        }
+        
+        this.currentPlayer = nextPlayer;
         this.hasMoved = false;
         this.selectedPiece = null;
         this.turnCount++;
@@ -1087,7 +1152,7 @@ class WallGame {
     checkPhaseTransition() {
         let allPlayersHave4Pieces = true;
         for (const player of this.players) {
-            if (player.pieces.length < 4) {
+            if (player.pieces.length < 4 && !player.surrendered) {
                 allPlayersHave4Pieces = false;
                 break;
             }
@@ -1100,10 +1165,20 @@ class WallGame {
     }
 
     checkGameEnd() {
+        // 检查是否所有玩家都投降了
+        const activePlayers = this.players.filter(player => !player.surrendered);
+        if (activePlayers.length <= 1) {
+            this.gameOver = true;
+            this.endGame();
+            return;
+        }
+        
         // 检查是否所有玩家都无法移动
         let canAnyPlayerMove = false;
         
         for (const player of this.players) {
+            if (player.surrendered) continue; // 跳过投降的玩家
+            
             for (const piece of player.pieces) {
                 if (!this.isPieceTrapped(piece.x, piece.y)) {
                     const validMoves = this.getValidPieceMoves(piece.x, piece.y);
@@ -1145,11 +1220,14 @@ class WallGame {
     endGame() {
         console.log('游戏结束！');
         
+        // 过滤掉投降的玩家
+        const activePlayers = this.players.filter(player => !player.surrendered);
+        
         // 确定获胜者
         let maxScore = -1;
         let winners = [];
         
-        this.players.forEach(player => {
+        activePlayers.forEach(player => {
             if (player.score > maxScore) {
                 maxScore = player.score;
                 winners = [player];
@@ -1191,12 +1269,13 @@ class WallGame {
             .sort((a, b) => b.score - a.score)
             .forEach(player => {
                 const isWinner = winners.some(winner => winner.id === player.id);
+                const isSurrendered = player.surrendered;
                 const scoreItem = document.createElement('div');
-                scoreItem.className = `score-item ${isWinner ? 'winner' : ''}`;
+                scoreItem.className = `score-item ${isWinner ? 'winner' : ''} ${isSurrendered ? 'surrendered' : ''}`;
                 scoreItem.innerHTML = `
                     <div class="score-player">
                         <div class="score-player-color" style="background: var(--${player.color}-color)"></div>
-                        <span class="score-player-name">${player.name}</span>
+                        <span class="score-player-name">${player.name} ${isSurrendered ? '(已投降)' : ''}</span>
                     </div>
                     <div class="score-value">${player.score}</div>
                 `;
@@ -1213,30 +1292,50 @@ class WallGame {
 
     saveGameState() {
         this.history.push({
-            cells: JSON.parse(JSON.stringify(this.cells)),
-            horizontalWalls: JSON.parse(JSON.stringify(this.horizontalWalls)),
-            verticalWalls: JSON.parse(JSON.stringify(this.verticalWalls)),
-            players: JSON.parse(JSON.stringify(this.players)),
+            cells: Utils.deepClone(this.cells),
+            horizontalWalls: Utils.deepClone(this.horizontalWalls),
+            verticalWalls: Utils.deepClone(this.verticalWalls),
+            players: Utils.deepClone(this.players),
             currentPlayer: this.currentPlayer,
             phase: this.phase,
-            territories: JSON.parse(JSON.stringify(this.territories))
+            territories: Utils.deepClone(this.territories)
         });
+        
+        // 限制历史记录数量
+        if (this.history.length > (this.config.maxUndoSteps || 10) + 1) {
+            this.history.shift();
+        }
     }
 
     undoMove() {
         console.log('悔棋');
-        if (this.history.length > 1 && this.config.allowUndo) {
+        if (this.history.length > 1 && this.config.allowUndo && !this.isCurrentPlayerAI()) {
+            // 移除当前状态
             this.history.pop();
-            const state = this.history.pop();
-            this.cells = state.cells;
-            this.horizontalWalls = state.horizontalWalls;
-            this.verticalWalls = state.verticalWalls;
-            this.players = state.players;
-            this.currentPlayer = state.currentPlayer;
-            this.phase = state.phase;
-            this.territories = state.territories;
+            // 获取上一个状态
+            const previousState = this.history[this.history.length - 1];
+            
+            // 恢复游戏状态
+            this.cells = Utils.deepClone(previousState.cells);
+            this.horizontalWalls = Utils.deepClone(previousState.horizontalWalls);
+            this.verticalWalls = Utils.deepClone(previousState.verticalWalls);
+            this.players = Utils.deepClone(previousState.players);
+            this.currentPlayer = previousState.currentPlayer;
+            this.phase = previousState.phase;
+            this.territories = Utils.deepClone(previousState.territories);
+            
+            // 重置UI状态
+            this.selectedPiece = null;
+            this.hasMoved = false;
+            this.wallOptions = [];
+            
+            // 重新创建棋盘
             this.recreateBoard();
             this.updateUI();
+            
+            this.addGameLog(`${this.players[this.currentPlayer].name} 悔棋`);
+        } else {
+            this.showMessage('无法悔棋');
         }
     }
 
@@ -1244,20 +1343,79 @@ class WallGame {
         const gameBoard = document.getElementById('game-board');
         if (!gameBoard) return;
         
+        // 清除现有内容但保留样式
+        const boardSizePx = parseInt(gameBoard.style.width) || 500;
         gameBoard.innerHTML = '';
-        this.createBoard();
+        gameBoard.style.width = `${boardSizePx}px`;
+        gameBoard.style.height = `${boardSizePx}px`;
+        
+        // 重新设置网格
+        gameBoard.style.display = 'grid';
+        gameBoard.style.gridTemplateColumns = `repeat(${this.boardSize}, 1fr)`;
+        gameBoard.style.gridTemplateRows = `repeat(${this.boardSize}, 1fr)`;
+        gameBoard.style.gap = '0px';
+        
+        const fragment = document.createDocumentFragment();
+
+        // 重新创建单元格和棋子
+        for (let y = 0; y < this.boardSize; y++) {
+            for (let x = 0; x < this.boardSize; x++) {
+                const cell = document.createElement('div');
+                cell.className = 'cell';
+                cell.dataset.x = x;
+                cell.dataset.y = y;
+                
+                // 设置单元格样式
+                cell.style.border = '1px solid #bdc3c7';
+                cell.style.display = 'flex';
+                cell.style.justifyContent = 'center';
+                cell.style.alignItems = 'center';
+                cell.style.position = 'relative';
+                cell.style.cursor = 'pointer';
+                cell.style.transition = 'all 0.15s ease';
+                cell.style.backgroundColor = '#ffffff';
+                cell.style.userSelect = 'none';
+                cell.style.webkitUserSelect = 'none';
+                cell.style.webkitTapHighlightColor = 'transparent';
+                
+                // 如果有棋子，重新创建
+                if (this.cells[y][x] !== null) {
+                    const playerId = this.cells[y][x];
+                    const player = this.players[playerId];
+                    const piece = document.createElement('div');
+                    piece.className = `piece ${player.color}`;
+                    piece.style.cssText = `
+                        width: 70%;
+                        height: 70%;
+                        border-radius: 50%;
+                        background: linear-gradient(135deg, var(--${player.color}-color), var(--${player.color}-dark));
+                        box-shadow: 0 3px 6px rgba(0, 0, 0, 0.3);
+                        position: relative;
+                        z-index: 10;
+                    `;
+                    cell.appendChild(piece);
+                }
+                
+                // 绑定事件
+                this.bindCellEvents(cell, x, y);
+                
+                fragment.appendChild(cell);
+            }
+        }
+
+        gameBoard.appendChild(fragment);
+        
+        // 重新绘制围墙和领地
+        setTimeout(() => {
+            this.drawWalls();
+            this.updateTerritoriesDisplay();
+        }, 50);
     }
 
     changePiece() {
         console.log('更换棋子');
         this.selectedPiece = null;
         this.clearHighlights();
-    }
-
-    passTurn() {
-        console.log('跳过回合');
-        this.switchToNextPlayer();
-        this.updateUI();
     }
 
     showPauseMenu() {
@@ -1320,7 +1478,29 @@ class WallGame {
 
     updateUI() {
         console.log('更新UI');
+        
+        // 显示/隐藏玩家面板
         this.players.forEach((player, index) => {
+            const playerInfo = document.getElementById(`player${index + 1}-info`);
+            if (playerInfo) {
+                if (index < this.players.length) {
+                    playerInfo.classList.remove('hidden');
+                    
+                    // 更新投降状态显示
+                    if (player.surrendered) {
+                        playerInfo.style.opacity = '0.5';
+                        const typeElement = playerInfo.querySelector('.player-type');
+                        if (typeElement) {
+                            typeElement.textContent = '已投降';
+                        }
+                    } else {
+                        playerInfo.style.opacity = '1';
+                    }
+                } else {
+                    playerInfo.classList.add('hidden');
+                }
+            }
+            
             const piecesElement = document.getElementById(`player${index + 1}-pieces`);
             const wallsElement = document.getElementById(`player${index + 1}-walls`);
             const scoreElement = document.getElementById(`player${index + 1}-score`);
@@ -1330,9 +1510,8 @@ class WallGame {
             if (scoreElement) scoreElement.textContent = player.score;
 
             // 更新当前玩家指示
-            const playerInfo = document.getElementById(`player${index + 1}-info`);
             if (playerInfo) {
-                playerInfo.classList.toggle('active', index === this.currentPlayer);
+                playerInfo.classList.toggle('active', index === this.currentPlayer && !player.surrendered);
             }
         });
 
@@ -1356,13 +1535,18 @@ class WallGame {
         // 更新控制按钮状态
         const changePieceBtn = document.getElementById('change-piece-btn');
         const undoBtn = document.getElementById('undo-btn');
+        const surrenderBtn = document.getElementById('surrender-btn');
         
         if (changePieceBtn) {
-            changePieceBtn.disabled = this.phase !== 'movement' || this.hasMoved || this.selectedPiece === null;
+            changePieceBtn.disabled = this.phase !== 'movement' || this.hasMoved || this.selectedPiece === null || this.isCurrentPlayerAI();
         }
         
         if (undoBtn) {
             undoBtn.disabled = this.history.length < 2 || !this.config.allowUndo || this.isCurrentPlayerAI();
+        }
+        
+        if (surrenderBtn) {
+            surrenderBtn.disabled = this.isCurrentPlayerAI() || this.players[this.currentPlayer].surrendered;
         }
     }
 }
