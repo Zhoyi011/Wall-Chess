@@ -1242,35 +1242,41 @@ class WallGame {
         this.addGameLog(`${currentPlayer.name} 移动了棋子`);
     }
 
-    isValidMove(fromX, fromY, toX, toY) {
-        if (toX < 0 || toX >= this.boardSize || toY < 0 || toY >= this.boardSize) {
-            return false;
-        }
-        if (this.cells[toY][toX] !== null) {
-            return false;
-        }
-        
-        const dx = Math.abs(toX - fromX);
-        const dy = Math.abs(toY - fromY);
-        
-        if ((dx === 1 && dy === 0) || (dx === 0 && dy === 1)) {
-            if (dx === 1) {
-                const wallX = Math.min(fromX, toX) + 1;
-                const wallY = fromY;
-                if (this.verticalWalls[wallX] && this.verticalWalls[wallX][wallY]) {
-                    return false;
-                }
-            } else {
-                const wallX = fromX;
-                const wallY = Math.min(fromY, toY) + 1;
-                if (this.horizontalWalls[wallY] && this.horizontalWalls[wallY][wallX]) {
-                    return false;
-                }
-            }
-            return true;
-        }
+// 修改 isValidMove 方法，添加被困检查
+isValidMove(fromX, fromY, toX, toY) {
+    if (toX < 0 || toX >= this.boardSize || toY < 0 || toY >= this.boardSize) {
         return false;
     }
+    if (this.cells[toY][toX] !== null) {
+        return false;
+    }
+    
+    // 检查棋子是否被困，如果被困则不能移动
+    if (this.isPieceTrapped(fromX, fromY)) {
+        return false;
+    }
+    
+    const dx = Math.abs(toX - fromX);
+    const dy = Math.abs(toY - fromY);
+    
+    if ((dx === 1 && dy === 0) || (dx === 0 && dy === 1)) {
+        if (dx === 1) {
+            const wallX = Math.min(fromX, toX) + 1;
+            const wallY = fromY;
+            if (this.verticalWalls[wallX] && this.verticalWalls[wallX][wallY]) {
+                return false;
+            }
+        } else {
+            const wallX = fromX;
+            const wallY = Math.min(fromY, toY) + 1;
+            if (this.horizontalWalls[wallY] && this.horizontalWalls[wallY][wallX]) {
+                return false;
+            }
+        }
+        return true;
+    }
+    return false;
+}
 
     switchToNextPlayer() {
         let nextPlayer = (this.currentPlayer + 1) % this.players.length;
@@ -1756,3 +1762,4 @@ document.addEventListener('DOMContentLoaded', () => {
         window.location.href = 'index.html';
     }
 });
+
