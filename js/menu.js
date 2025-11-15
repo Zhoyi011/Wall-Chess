@@ -1,4 +1,3 @@
-
 // 菜单管理器
 class MenuManager {
     constructor() {
@@ -257,6 +256,9 @@ class MenuManager {
                 return;
             }
 
+            // 确保统计信息已初始化
+            this.initializeStatistics();
+
             // 保存游戏配置到本地存储
             const success = Utils.storage.set('currentGameConfig', gameConfig);
             if (!success) {
@@ -283,6 +285,19 @@ class MenuManager {
             console.error('启动游戏时出错:', error);
             this.showError('启动游戏时出错: ' + error.message);
         }
+    }
+
+    // 初始化统计信息
+    initializeStatistics() {
+        const stats = settingsManager.settings;
+        
+        // 确保统计字段存在
+        if (stats.gamesPlayed === undefined) stats.gamesPlayed = 0;
+        if (stats.gamesWon === undefined) stats.gamesWon = 0;
+        if (stats.bestScore === undefined) stats.bestScore = 0;
+        if (stats.totalPlayTime === undefined) stats.totalPlayTime = 0;
+        
+        settingsManager.saveSettings();
     }
 
     saveSettings() {
@@ -319,13 +334,26 @@ class MenuManager {
 
     loadStatistics() {
         try {
-            const gamesPlayed = settingsManager.settings.gamesPlayed || 0;
-            const bestScore = settingsManager.settings.bestScore || 0;
-            const winRate = settingsManager.getWinRate() || 0;
+            const stats = settingsManager.settings;
+            
+            // 确保统计字段存在
+            this.initializeStatistics();
+            
+            const gamesPlayed = stats.gamesPlayed || 0;
+            const bestScore = stats.bestScore || 0;
+            const winRate = settingsManager.getWinRate();
 
-            document.getElementById('games-played').textContent = gamesPlayed;
-            document.getElementById('best-score').textContent = bestScore;
-            document.getElementById('win-rate').textContent = `${winRate}%`;
+            console.log('加载统计信息:', { gamesPlayed, bestScore, winRate });
+
+            // 更新UI显示
+            const gamesPlayedElement = document.getElementById('games-played');
+            const bestScoreElement = document.getElementById('best-score');
+            const winRateElement = document.getElementById('win-rate');
+
+            if (gamesPlayedElement) gamesPlayedElement.textContent = gamesPlayed;
+            if (bestScoreElement) bestScoreElement.textContent = bestScore;
+            if (winRateElement) winRateElement.textContent = `${winRate}%`;
+
         } catch (error) {
             console.error('加载统计信息时出错:', error);
         }
