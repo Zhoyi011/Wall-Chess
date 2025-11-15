@@ -128,16 +128,27 @@ class WallGame {
     }
 
     drawWalls() {
+        console.log('开始绘制围墙，水平围墙:', this.horizontalWalls, '垂直围墙:', this.verticalWalls);
+        
         // 清除现有围墙
         const existingWalls = document.querySelectorAll('.wall');
-        existingWalls.forEach(wall => wall.remove());
+        existingWalls.forEach(wall => {
+            if (wall.parentNode) {
+                wall.parentNode.removeChild(wall);
+            }
+        });
 
         const gameBoard = document.getElementById('game-board');
-        if (!gameBoard) return;
+        if (!gameBoard) {
+            console.error('找不到游戏棋盘');
+            return;
+        }
 
         const boardSizePx = 400;
         const cellSize = boardSizePx / this.boardSize;
         const fragment = document.createDocumentFragment();
+
+        let wallCount = 0;
 
         // 绘制水平围墙
         for (let y = 0; y < this.horizontalWalls.length; y++) {
@@ -149,13 +160,16 @@ class WallGame {
                         position: absolute;
                         background-color: #2c3e50;
                         width: ${cellSize}px;
-                        height: 6px;
+                        height: 8px;
                         left: ${x * cellSize}px;
                         top: ${(y - 0.5) * cellSize}px;
-                        z-index: 2;
+                        z-index: 5;
                         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+                        border-radius: 2px;
                     `;
                     fragment.appendChild(wall);
+                    wallCount++;
+                    console.log(`绘制水平围墙: (${x}, ${y})`);
                 }
             }
         }
@@ -169,28 +183,28 @@ class WallGame {
                     wall.style.cssText = `
                         position: absolute;
                         background-color: #2c3e50;
-                        width: 6px;
+                        width: 8px;
                         height: ${cellSize}px;
                         left: ${(x - 0.5) * cellSize}px;
                         top: ${y * cellSize}px;
-                        z-index: 2;
+                        z-index: 5;
                         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+                        border-radius: 2px;
                     `;
                     fragment.appendChild(wall);
+                    wallCount++;
+                    console.log(`绘制垂直围墙: (${x}, ${y})`);
                 }
             }
         }
 
         gameBoard.appendChild(fragment);
+        console.log(`围墙绘制完成，共绘制了 ${wallCount} 个围墙`);
     }
 
     bindEvents() {
         console.log('开始绑定事件...');
-        
-        // 直接绑定按钮事件
         this.bindButtonEvents();
-        
-        // 绑定模态框事件
         this.bindModalEvents();
     }
 
@@ -605,6 +619,7 @@ class WallGame {
         });
 
         gameBoard.appendChild(fragment);
+        console.log(`显示了 ${this.wallOptions.length} 个围墙选项`);
     }
 
     clearWallOptions() {
@@ -616,89 +631,122 @@ class WallGame {
         this.wallOptions = [];
     }
 
-    // 其他方法保持不变...
-    showPauseMenu() {
-        console.log('显示暂停菜单');
-        const modal = document.getElementById('pause-modal');
+    placeWall(x, y, orientation) {
+        console.log(`放置围墙: (${x}, ${y}), 方向: ${orientation}`);
+        
+        const currentPlayer = this.players[this.currentPlayer];
+        
+        // 检查围墙数量
+        if (currentPlayer.walls <= 0 && this.config.maxWalls !== 999) {
+            this.showMessage('围墙数量不足！');
+            return;
+        }
+
+        // 检查是否可以放置围墙
+        if (!this.canPlaceWall(x, y, orientation)) {
+            this.showMessage('这里不能放置围墙！');
+            return;
+        }
+
+        this.saveGameState();
+
+        // 放置围墙
+        if (orientation === 'horizontal') {
+            this.horizontalWalls[y][x] = true;
+            console.log(`设置水平围墙[${y}][${x}] = true`);
+        } else {
+            this.verticalWalls[x][y] = true;
+            console.log(`设置垂直围墙[${x}][${y}] = true`);
+        }
+
+        // 减少围墙数量
+        if (this.config.maxWalls !== 999) {
+            currentPlayer.walls--;
+        }
+
+        // 重新绘制围墙
+        this.drawWalls();
+        this.clearWallOptions();
+        
+        this.addGameLog(`${currentPlayer.name} 放置了围墙`);
+
+        // 检测领地
+        this.detectTerritories();
+
+        this.selectedPiece = null;
+        this.hasMoved = false;
+
+        this.switchToNextPlayer();
+        this.updateUI();
+
+        // 检查游戏结束
+        this.checkGameEnd();
+
+        // 检查AI移动
+        if (this.isCurrentPlayerAI()) {
+            setTimeout(() => this.makeAIMove(), 500);
+        }
+    }
+
+    canPlaceWall(x, y, orientation) {
+        if (orientation === 'horizontal') {
+            // 检查水平围墙
+            if (y <= 0 || y >= this.horizontalWalls.length) return false;
+            if (x < 0 || x >= this.horizontalWalls[y].length) return false;
+            
+            // 检查是否已有围墙
+            if (this.horizontalWalls[y][x]) {
+                console.log(`位置 (${x}, ${y}) 已有水平围墙`);
+                return false;
+            }
+            
+            return true;
+        } else {
+            // 检查垂直围墙
+            if (x <= 0 || x >= this.verticalWalls.length) return false;
+            if (y < 0 || y >= this.verticalWalls[x].length) return false;
+            
+            // 检查是否已有围墙
+            if (this.verticalWalls[x][y]) {
+                console.log(`位置 (${x}, ${y}) 已有垂直围墙`);
+                return false;
+            }
+            
+            return true;
+        }
+    }
+
+    detectTerritories() {
+        console.log('检测领地...');
+        // 简化领地检测
+        this.players.forEach(player => {
+            player.score = player.pieces.length * 2; // 临时计分
+        });
+        this.updateUI();
+    }
+
+    checkGameEnd() {
+        // 简化游戏结束检查
+        let canMove = false;
+        for (const player of this.players) {
+            if (player.pieces.length > 0) {
+                canMove = true;
+                break;
+            }
+        }
+        
+        if (!canMove) {
+            this.gameOver = true;
+            this.showGameOverModal();
+        }
+    }
+
+    showGameOverModal() {
+        console.log('显示游戏结束弹窗');
+        const modal = document.getElementById('game-over-modal');
         if (modal) {
             modal.classList.add('show');
         }
-    }
-
-    hidePauseMenu() {
-        console.log('隐藏暂停菜单');
-        const modal = document.getElementById('pause-modal');
-        if (modal) {
-            modal.classList.remove('show');
-        }
-    }
-
-    restartGame() {
-        console.log('重新开始游戏');
-        if (confirm('确定要重新开始游戏吗？')) {
-            window.location.reload();
-        }
-    }
-
-    returnToMenu() {
-        console.log('返回菜单');
-        if (confirm('确定要返回主菜单吗？当前游戏进度将丢失。')) {
-            window.location.href = 'index.html';
-        }
-    }
-
-    showSettings() {
-        console.log('显示设置');
-        alert('设置功能将在后续版本中添加');
-    }
-
-    showHints() {
-        console.log('显示提示');
-        if (!this.config.showHints) {
-            this.showMessage('提示功能已禁用，请在设置中启用');
-            return;
-        }
-        this.showMessage('提示：尽量将棋子放置在棋盘中央区域');
-    }
-
-    showMessage(message) {
-        console.log('显示消息:', message);
-        alert(message);
-    }
-
-    addGameLog(message) {
-        console.log('添加游戏日志:', message);
-        const logContent = document.getElementById('game-log');
-        if (!logContent) return;
-        
-        const logEntry = document.createElement('div');
-        logEntry.className = 'log-entry';
-        logEntry.textContent = message;
-        
-        logContent.appendChild(logEntry);
-        logContent.scrollTop = logContent.scrollHeight;
-    }
-
-    updateUI() {
-        console.log('更新UI');
-        // 简化UI更新逻辑
-        this.players.forEach((player, index) => {
-            const piecesElement = document.getElementById(`player${index + 1}-pieces`);
-            const wallsElement = document.getElementById(`player${index + 1}-walls`);
-            const scoreElement = document.getElementById(`player${index + 1}-score`);
-            
-            if (piecesElement) piecesElement.textContent = `${player.pieces.length}/4`;
-            if (wallsElement) wallsElement.textContent = this.config.maxWalls === 999 ? '∞' : player.walls;
-            if (scoreElement) scoreElement.textContent = player.score;
-        });
-
-        // 更新当前玩家指示
-        this.players.forEach((player, index) => {
-            const playerInfo = document.getElementById(`player${index + 1}-info`);
-            if (playerInfo) {
-                playerInfo.classList.toggle('active', index === this.currentPlayer);
-            }
-        });
     }
 
     // 其他必要的方法...
@@ -714,17 +762,13 @@ class WallGame {
         const dy = Math.abs(toY - fromY);
         
         if ((dx === 1 && dy === 0) || (dx === 0 && dy === 1)) {
-            return true; // 简化移动验证
+            return true;
         }
         return false;
     }
 
-    canPlaceWall(x, y, orientation) {
-        return true; // 简化围墙放置验证
-    }
-
     isPieceTrapped(x, y) {
-        return false; // 简化棋子困住检查
+        return false;
     }
 
     switchToNextPlayer() {
@@ -734,6 +778,7 @@ class WallGame {
         this.turnCount++;
         this.clearHighlights();
         this.clearWallOptions();
+        console.log(`切换到玩家 ${this.currentPlayer}`);
     }
 
     checkPhaseTransition() {
@@ -772,18 +817,14 @@ class WallGame {
         }
     }
 
-    placeWall(x, y, orientation) {
-        console.log(`放置围墙: (${x}, ${y}), 方向: ${orientation}`);
-        // 简化围墙放置
-        this.switchToNextPlayer();
-        this.updateUI();
-    }
-
     saveGameState() {
-        // 简化历史记录
         this.history.push({
             cells: JSON.parse(JSON.stringify(this.cells)),
-            currentPlayer: this.currentPlayer
+            horizontalWalls: JSON.parse(JSON.stringify(this.horizontalWalls)),
+            verticalWalls: JSON.parse(JSON.stringify(this.verticalWalls)),
+            players: JSON.parse(JSON.stringify(this.players)),
+            currentPlayer: this.currentPlayer,
+            phase: this.phase
         });
     }
 
@@ -793,7 +834,11 @@ class WallGame {
             this.history.pop();
             const state = this.history.pop();
             this.cells = state.cells;
+            this.horizontalWalls = state.horizontalWalls;
+            this.verticalWalls = state.verticalWalls;
+            this.players = state.players;
             this.currentPlayer = state.currentPlayer;
+            this.phase = state.phase;
             this.recreateBoard();
             this.updateUI();
         }
@@ -818,22 +863,105 @@ class WallGame {
         this.switchToNextPlayer();
         this.updateUI();
     }
+
+    showPauseMenu() {
+        console.log('显示暂停菜单');
+        const modal = document.getElementById('pause-modal');
+        if (modal) {
+            modal.classList.add('show');
+        }
+    }
+
+    hidePauseMenu() {
+        console.log('隐藏暂停菜单');
+        const modal = document.getElementById('pause-modal');
+        if (modal) {
+            modal.classList.remove('show');
+        }
+    }
+
+    restartGame() {
+        console.log('重新开始游戏');
+        if (confirm('确定要重新开始游戏吗？')) {
+            window.location.reload();
+        }
+    }
+
+    returnToMenu() {
+        console.log('返回菜单');
+        if (confirm('确定要返回主菜单吗？当前游戏进度将丢失。')) {
+            window.location.href = 'index.html';
+        }
+    }
+
+    showSettings() {
+        console.log('显示设置');
+        alert('设置功能将在后续版本中添加');
+    }
+
+    showHints() {
+        console.log('显示提示');
+        this.showMessage('提示：尽量将棋子放置在棋盘中央区域');
+    }
+
+    showMessage(message) {
+        console.log('显示消息:', message);
+        alert(message);
+    }
+
+    addGameLog(message) {
+        console.log('添加游戏日志:', message);
+        const logContent = document.getElementById('game-log');
+        if (!logContent) return;
+        
+        const logEntry = document.createElement('div');
+        logEntry.className = 'log-entry';
+        logEntry.textContent = message;
+        
+        logContent.appendChild(logEntry);
+        logContent.scrollTop = logContent.scrollHeight;
+    }
+
+    updateUI() {
+        console.log('更新UI');
+        this.players.forEach((player, index) => {
+            const piecesElement = document.getElementById(`player${index + 1}-pieces`);
+            const wallsElement = document.getElementById(`player${index + 1}-walls`);
+            const scoreElement = document.getElementById(`player${index + 1}-score`);
+            
+            if (piecesElement) piecesElement.textContent = `${player.pieces.length}/4`;
+            if (wallsElement) wallsElement.textContent = this.config.maxWalls === 999 ? '∞' : player.walls;
+            if (scoreElement) scoreElement.textContent = player.score;
+
+            // 更新当前玩家指示
+            const playerInfo = document.getElementById(`player${index + 1}-info`);
+            if (playerInfo) {
+                playerInfo.classList.toggle('active', index === this.currentPlayer);
+            }
+        });
+
+        // 更新阶段显示
+        const phaseText = document.querySelector('.phase-text');
+        if (phaseText) {
+            phaseText.textContent = this.phase === 'placement' ? '放置阶段' : '移动阶段';
+        }
+
+        // 更新回合显示
+        const turnText = document.querySelector('.turn-text');
+        if (turnText) {
+            turnText.textContent = `${this.players[this.currentPlayer].name}的回合`;
+        }
+
+        const turnCount = document.getElementById('turn-count');
+        if (turnCount) {
+            turnCount.textContent = this.turnCount;
+        }
+    }
 }
 
 // 游戏初始化
 document.addEventListener('DOMContentLoaded', () => {
     console.log('=== 游戏页面加载完成 ===');
-    
-    // 检查所有必要的元素
-    const requiredElements = [
-        'game-board', 'menu-btn', 'restart-btn', 'undo-btn', 
-        'change-piece-btn', 'pass-turn-btn', 'pause-btn', 'hint-btn'
-    ];
-    
-    requiredElements.forEach(id => {
-        const element = document.getElementById(id);
-        console.log(`元素 #${id}:`, element ? '找到' : '未找到');
-    });
     
     const gameConfig = Utils.storage.get('currentGameConfig');
     console.log('加载的游戏配置:', gameConfig);
