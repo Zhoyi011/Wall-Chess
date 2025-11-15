@@ -1,4 +1,4 @@
-// AI玩家类
+// 增强版AI玩家类
 class AIPlayer {
     constructor(difficulty, playerId) {
         this.difficulty = difficulty;
@@ -8,9 +8,9 @@ class AIPlayer {
 
     getThinkingTime() {
         switch (this.difficulty) {
-            case 'easy': return 500 + Math.random() * 1000;
-            case 'medium': return 1000 + Math.random() * 1500;
-            case 'hard': return 2000 + Math.random() * 2000;
+            case 'easy': return 800 + Math.random() * 800;
+            case 'medium': return 1200 + Math.random() * 1000;
+            case 'hard': return 2000 + Math.random() * 1500;
             default: return 1000;
         }
     }
@@ -34,7 +34,7 @@ class AIPlayer {
                 move = await this.makeHardMove(gameState);
                 break;
             default:
-                move = this.makeEasyMove(gameState);
+                move = this.makeMediumMove(gameState);
         }
         
         // 隐藏思考指示器
@@ -43,37 +43,41 @@ class AIPlayer {
         return move;
     }
 
-    // 简单AI：随机移动
+    // 简单AI：随机移动但避免明显错误
     makeEasyMove(gameState) {
         const validMoves = this.getAllValidMoves(gameState);
         if (validMoves.length === 0) return null;
         
+        // 优先选择能围地的移动
+        const territoryMoves = validMoves.filter(move => 
+            this.evaluateMovePotential(gameState, move) > 2
+        );
+        
+        if (territoryMoves.length > 0) {
+            return territoryMoves[Utils.randomInt(0, territoryMoves.length - 1)];
+        }
+        
         // 随机选择一个移动
-        const randomMove = validMoves[Utils.randomInt(0, validMoves.length - 1)];
-        return randomMove;
+        return validMoves[Utils.randomInt(0, validMoves.length - 1)];
     }
 
-    // 中等AI：基于简单策略
+    // 中等AI：基于策略的移动
     makeMediumMove(gameState) {
         const validMoves = this.getAllValidMoves(gameState);
         if (validMoves.length === 0) return null;
 
-        // 优先选择能围地的移动
-        const territoryMoves = validMoves.filter(move => 
-            this.evaluateTerritoryPotential(gameState, move) > 0
-        );
+        // 评估每个移动的得分
+        const scoredMoves = validMoves.map(move => ({
+            move,
+            score: this.evaluateMove(gameState, move)
+        }));
 
-        if (territoryMoves.length > 0) {
-            // 选择能围最大领地的移动
-            territoryMoves.sort((a, b) => 
-                this.evaluateTerritoryPotential(gameState, b) - 
-                this.evaluateTerritoryPotential(gameState, a)
-            );
-            return territoryMoves[0];
-        }
-
-        // 如果没有围地机会，随机选择
-        return validMoves[Utils.randomInt(0, validMoves.length - 1)];
+        // 按得分排序
+        scoredMoves.sort((a, b) => b.score - a.score);
+        
+        // 选择前25%的移动中随机一个（增加一些随机性）
+        const topMoves = scoredMoves.slice(0, Math.max(1, Math.floor(scoredMoves.length * 0.25)));
+        return topMoves[Utils.randomInt(0, topMoves.length - 1)].move;
     }
 
     // 困难AI：使用Minimax算法
@@ -83,7 +87,7 @@ class AIPlayer {
 
         let bestMove = null;
         let bestScore = -Infinity;
-        const depth = 2; // 搜索深度
+        const depth = this.getSearchDepth();
 
         // 评估每个可能的移动
         for (const move of validMoves) {
@@ -97,6 +101,217 @@ class AIPlayer {
         }
 
         return bestMove || validMoves[0];
+    }
+
+    getSearchDepth() {
+        switch (this.difficulty) {
+            case 'easy': return 1;
+            case 'medium': return 2;
+            case 'hard': return 3;
+            default: return 2;
+        }
+    }
+
+    // 评估移动的潜在价值
+    evaluateMovePotential(gameState, move) {
+        let score = 0;
+        
+        if (move.type === 'placement') {
+            // 放置棋子在中部区域更有价值
+            const centerX = gameState.boardSize / 2;
+            const centerY = gameState.boardSize / 2;
+            const distanceFromCenter = Math.abs(move.x - centerX) + Math.abs(move.y - centerY);
+            score += (gameState.boardSize - distanceFromCenter) * 2;
+            
+            // 靠近其他棋子有价值（形成集团）
+            const nearbyPieces = this.countNearbyPieces(gameState, move.x, move.y, this.playerId);
+            score += nearbyPieces * 3;
+        } else {
+            // 移动棋子评估
+            const fromValue = this.getPositionValue(gameState, move.fromX, move.fromY);
+            const toValue = this.getPositionValue(gameState, move.toX, move.toY);
+            score += (toValue - fromValue) * 2;
+            
+            // 移动后能形成领地更有价值
+            const territoryPotential = this.evaluateTerritoryPotentialAfterMove(gameState, move);
+            score += territoryPotential * 5;
+        }
+        
+        return score;
+    }
+
+    // 评估移动的综合价值
+    evaluateMove(gameState, move) {
+        let score = 0;
+        
+        // 基础移动价值
+        score += this.evaluateMovePotential(gameState, move);
+        
+        // 领地潜力
+        score += this.evaluateTerritoryPotential(gameState, move) * 8;
+        
+        // 阻碍对手
+        score += this.evaluateOpponentBlocking(gameState, move) * 6;
+        
+        // 棋子安全性
+        score += this.evaluatePieceSafety(gameState, move) * 4;
+        
+        return score;
+    }
+
+    // 评估领地潜力
+    evaluateTerritoryPotential(gameState, move) {
+        let potential = 0;
+        
+        if (move.type === 'placement') {
+            // 检查放置棋子后能否形成领地
+            potential += this.estimateTerritorySize(gameState, move.x, move.y, this.playerId);
+        } else {
+            // 检查移动后能否形成领地
+            potential += this.estimateTerritorySize(gameState, move.toX, move.toY, this.playerId);
+        }
+        
+        return potential;
+    }
+
+    // 评估阻碍对手的能力
+    evaluateOpponentBlocking(gameState, move) {
+        let blockingScore = 0;
+        
+        // 获取所有对手
+        const opponents = gameState.players.filter(player => player.id !== this.playerId);
+        
+        opponents.forEach(opponent => {
+            // 评估这个移动对对手的阻碍程度
+            if (move.type === 'placement') {
+                // 放置棋子在对手可能扩张的路径上
+                blockingScore += this.evaluatePositionBlocking(gameState, move.x, move.y, opponent.id);
+            } else {
+                // 移动棋子阻碍对手
+                blockingScore += this.evaluatePositionBlocking(gameState, move.toX, move.toY, opponent.id);
+            }
+        });
+        
+        return blockingScore;
+    }
+
+    // 评估棋子安全性
+    evaluatePieceSafety(gameState, move) {
+        if (move.type === 'movement') {
+            // 检查目标位置是否安全（不被立即围困）
+            const safety = this.evaluatePositionSafety(gameState, move.toX, move.toY);
+            return safety;
+        }
+        return 0;
+    }
+
+    // 估算领地大小
+    estimateTerritorySize(gameState, x, y, playerId) {
+        let size = 0;
+        const visited = new Set();
+        const queue = [{x, y}];
+        visited.add(`${x},${y}`);
+        
+        while (queue.length > 0 && size < 20) { // 限制搜索深度
+            const current = queue.shift();
+            size++;
+            
+            const directions = [
+                {dx: 0, dy: -1}, {dx: 0, dy: 1},
+                {dx: -1, dy: 0}, {dx: 1, dy: 0}
+            ];
+            
+            for (const dir of directions) {
+                const newX = current.x + dir.dx;
+                const newY = current.y + dir.dy;
+                
+                if (newX >= 0 && newX < gameState.boardSize && 
+                    newY >= 0 && newY < gameState.boardSize) {
+                    const key = `${newX},${newY}`;
+                    
+                    if (!visited.has(key) && 
+                        gameState.cells[newY][newX] === null &&
+                        !this.isWallBetween(gameState, current.x, current.y, newX, newY)) {
+                        visited.add(key);
+                        queue.push({x: newX, y: newY});
+                    }
+                }
+            }
+        }
+        
+        return size;
+    }
+
+    // 评估位置阻碍价值
+    evaluatePositionBlocking(gameState, x, y, opponentId) {
+        let blockingValue = 0;
+        
+        // 检查这个位置是否在对手的扩张路径上
+        const opponentPieces = gameState.players[opponentId].pieces;
+        
+        opponentPieces.forEach(piece => {
+            const distance = Math.abs(piece.x - x) + Math.abs(piece.y - y);
+            if (distance <= 3) {
+                blockingValue += (4 - distance);
+            }
+        });
+        
+        return blockingValue;
+    }
+
+    // 评估位置安全性
+    evaluatePositionSafety(gameState, x, y) {
+        let escapeRoutes = 0;
+        
+        const directions = [
+            {dx: 0, dy: -1}, {dx: 0, dy: 1},
+            {dx: -1, dy: 0}, {dx: 1, dy: 0}
+        ];
+        
+        for (const dir of directions) {
+            const newX = x + dir.dx;
+            const newY = y + dir.dy;
+            
+            if (newX >= 0 && newX < gameState.boardSize && 
+                newY >= 0 && newY < gameState.boardSize &&
+                gameState.cells[newY][newX] === null &&
+                !this.isWallBetween(gameState, x, y, newX, newY)) {
+                escapeRoutes++;
+            }
+        }
+        
+        return escapeRoutes;
+    }
+
+    // 计算附近棋子数量
+    countNearbyPieces(gameState, x, y, playerId) {
+        let count = 0;
+        const directions = [
+            {dx: -1, dy: -1}, {dx: 0, dy: -1}, {dx: 1, dy: -1},
+            {dx: -1, dy: 0},                     {dx: 1, dy: 0},
+            {dx: -1, dy: 1},  {dx: 0, dy: 1},  {dx: 1, dy: 1}
+        ];
+        
+        for (const dir of directions) {
+            const newX = x + dir.dx;
+            const newY = y + dir.dy;
+            
+            if (newX >= 0 && newX < gameState.boardSize && 
+                newY >= 0 && newY < gameState.boardSize &&
+                gameState.cells[newY][newX] === playerId) {
+                count++;
+            }
+        }
+        
+        return count;
+    }
+
+    // 获取位置价值（中部更有价值）
+    getPositionValue(gameState, x, y) {
+        const centerX = gameState.boardSize / 2;
+        const centerY = gameState.boardSize / 2;
+        const distanceFromCenter = Math.abs(x - centerX) + Math.abs(y - centerY);
+        return (gameState.boardSize - distanceFromCenter);
     }
 
     // Minimax算法 with Alpha-Beta剪枝
@@ -128,6 +343,75 @@ class AIPlayer {
             }
             return minEval;
         }
+    }
+
+    // 评估状态得分
+    evaluateState(state) {
+        let score = 0;
+        const myPlayer = state.players[this.playerId];
+        const otherPlayers = state.players.filter((_, index) => index !== this.playerId);
+
+        // 当前得分
+        score += myPlayer.score * 20;
+
+        // 棋子移动性
+        const mobility = this.calculateMobility(state, this.playerId);
+        score += mobility * 3;
+
+        // 领地潜力
+        const territoryPotential = this.evaluateTotalTerritoryPotential(state, this.playerId);
+        score += territoryPotential * 8;
+
+        // 棋子位置价值
+        const positionValue = this.evaluatePiecePositions(state, this.playerId);
+        score += positionValue * 2;
+
+        // 阻碍对手
+        for (const player of otherPlayers) {
+            const opponentMobility = this.calculateMobility(state, player.id);
+            score -= opponentMobility * 2;
+            
+            const opponentPotential = this.evaluateTotalTerritoryPotential(state, player.id);
+            score -= opponentPotential * 6;
+        }
+
+        return score;
+    }
+
+    // 评估总领地潜力
+    evaluateTotalTerritoryPotential(state, playerId) {
+        let totalPotential = 0;
+        const player = state.players[playerId];
+        
+        for (const piece of player.pieces) {
+            totalPotential += this.estimateTerritorySize(state, piece.x, piece.y, playerId);
+        }
+        
+        return totalPotential;
+    }
+
+    // 评估棋子位置价值
+    evaluatePiecePositions(state, playerId) {
+        let totalValue = 0;
+        const player = state.players[playerId];
+        
+        for (const piece of player.pieces) {
+            totalValue += this.getPositionValue(state, piece.x, piece.y);
+        }
+        
+        return totalValue;
+    }
+
+    // 计算移动性
+    calculateMobility(state, playerId) {
+        let mobility = 0;
+        const player = state.players[playerId];
+
+        for (const piece of player.pieces) {
+            mobility += this.getValidPieceMoves(state, piece.x, piece.y).length;
+        }
+
+        return mobility;
     }
 
     // 获取所有有效移动
@@ -193,10 +477,10 @@ class AIPlayer {
         if (gameState.cells[toY][toX] !== null) {
             return false;
         }
-
+        
         const dx = Math.abs(toX - fromX);
         const dy = Math.abs(toY - fromY);
-
+        
         if ((dx === 1 && dy === 0) || (dx === 0 && dy === 1)) {
             // 检查围墙阻挡
             if (dx === 1) {
@@ -217,82 +501,17 @@ class AIPlayer {
         return false;
     }
 
-    // 评估状态得分
-    evaluateState(state) {
-        let score = 0;
-        const myPlayer = state.players[this.playerId];
-        const otherPlayers = state.players.filter((_, index) => index !== this.playerId);
-
-        // 当前得分
-        score += myPlayer.score * 10;
-
-        // 棋子移动性
-        const mobility = this.calculateMobility(state, this.playerId);
-        score += mobility * 2;
-
-        // 领地潜力
-        const territoryPotential = this.evaluateTerritoryPotential(state);
-        score += territoryPotential * 5;
-
-        // 阻碍对手
-        for (const player of otherPlayers) {
-            const opponentMobility = this.calculateMobility(state, player.id);
-            score -= opponentMobility;
+    // 检查围墙阻挡
+    isWallBetween(gameState, x1, y1, x2, y2) {
+        if (x1 === x2) {
+            // 垂直移动 - 检查水平围墙
+            const wallY = Math.min(y1, y2) + 1;
+            return gameState.horizontalWalls[wallY] && gameState.horizontalWalls[wallY][x1];
+        } else {
+            // 水平移动 - 检查垂直围墙
+            const wallX = Math.min(x1, x2) + 1;
+            return gameState.verticalWalls[wallX] && gameState.verticalWalls[wallX][y1];
         }
-
-        return score;
-    }
-
-    // 计算移动性
-    calculateMobility(state, playerId) {
-        let mobility = 0;
-        const player = state.players[playerId];
-
-        for (const piece of player.pieces) {
-            mobility += this.getValidPieceMoves(state, piece.x, piece.y).length;
-        }
-
-        return mobility;
-    }
-
-    // 评估领地潜力
-    evaluateTerritoryPotential(state, move = null) {
-        // 简化版的领地潜力评估
-        // 在实际实现中，这里应该使用BFS来检测潜在的领地
-        let potential = 0;
-        
-        // 检查当前玩家棋子的周围区域
-        const myPlayer = state.players[this.playerId];
-        for (const piece of myPlayer.pieces) {
-            // 检查棋子周围的空位数量
-            const emptyNeighbors = this.countEmptyNeighbors(state, piece.x, piece.y);
-            potential += emptyNeighbors;
-        }
-        
-        return potential;
-    }
-
-    // 计算空邻居数量
-    countEmptyNeighbors(state, x, y) {
-        let count = 0;
-        const directions = [
-            { dx: -1, dy: -1 }, { dx: 0, dy: -1 }, { dx: 1, dy: -1 },
-            { dx: -1, dy: 0 },                     { dx: 1, dy: 0 },
-            { dx: -1, dy: 1 },  { dx: 0, dy: 1 },  { dx: 1, dy: 1 }
-        ];
-
-        for (const dir of directions) {
-            const newX = x + dir.dx;
-            const newY = y + dir.dy;
-            
-            if (newX >= 0 && newX < state.boardSize && newY >= 0 && newY < state.boardSize) {
-                if (state.cells[newY][newX] === null) {
-                    count++;
-                }
-            }
-        }
-        
-        return count;
     }
 
     // 模拟移动
@@ -406,7 +625,7 @@ class AIPlayer {
     chooseBestWallOption(wallOptions) {
         if (wallOptions.length === 0) return null;
         
-        // 简单策略：随机选择一个
+        // 简单策略：随机选择一个（可以在这里添加更复杂的围墙选择逻辑）
         return wallOptions[Utils.randomInt(0, wallOptions.length - 1)];
     }
 
