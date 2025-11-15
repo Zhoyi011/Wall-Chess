@@ -56,6 +56,8 @@ class WallGame {
 
     init() {
         console.log('初始化游戏，棋盘大小:', this.boardSize);
+        console.log('玩家配置:', this.players);
+        
         this.createBoard();
         this.bindEvents();
         this.updateUI();
@@ -63,6 +65,7 @@ class WallGame {
         
         // 如果第一个玩家是AI，自动开始
         if (this.isCurrentPlayerAI()) {
+            console.log('第一个玩家是AI，开始AI移动');
             setTimeout(() => this.makeAIMove(), 1000);
         }
     }
@@ -77,14 +80,13 @@ class WallGame {
         // 清除现有内容
         gameBoard.innerHTML = '';
         
-        // 设置棋盘尺寸和样式 - 移动端适配
-        const isMobile = this.isMobileDevice();
-        const boardSizePx = isMobile ? Math.min(window.innerWidth - 40, 400) : 400;
+        // 设置棋盘尺寸和样式
+        const boardSizePx = 500;
         gameBoard.style.width = `${boardSizePx}px`;
         gameBoard.style.height = `${boardSizePx}px`;
         gameBoard.style.position = 'relative';
-        gameBoard.style.background = '#f8f9fa';
-        gameBoard.style.border = '2px solid #2c3e50';
+        gameBoard.style.background = '#ffffff';
+        gameBoard.style.border = '3px solid #2c3e50';
         gameBoard.style.borderRadius = '8px';
         gameBoard.style.margin = '0 auto';
         gameBoard.style.overflow = 'visible';
@@ -106,8 +108,8 @@ class WallGame {
                 cell.dataset.x = x;
                 cell.dataset.y = y;
                 
-                // 设置单元格样式 - 移动端适配
-                cell.style.border = '1px solid #95a5a6';
+                // 设置单元格样式
+                cell.style.border = '1px solid #bdc3c7';
                 cell.style.display = 'flex';
                 cell.style.justifyContent = 'center';
                 cell.style.alignItems = 'center';
@@ -127,10 +129,14 @@ class WallGame {
         }
 
         gameBoard.appendChild(fragment);
-        this.drawWalls();
-        this.updateTerritoriesDisplay();
         
-        console.log('棋盘创建完成');
+        // 确保围墙正确绘制
+        setTimeout(() => {
+            this.drawWalls();
+            this.updateTerritoriesDisplay();
+        }, 100);
+        
+        console.log('棋盘创建完成，尺寸:', boardSizePx, '单元格数量:', this.boardSize * this.boardSize);
     }
 
     bindCellEvents(cell, x, y) {
@@ -231,6 +237,7 @@ class WallGame {
         }
 
         gameBoard.appendChild(fragment);
+        console.log('围墙绘制完成');
     }
 
     // 检测领地
@@ -531,7 +538,7 @@ class WallGame {
                 
                 // 重置单元格样式
                 fromCell.style.backgroundColor = '';
-                fromCell.style.border = '1px solid #95a5a6';
+                fromCell.style.border = '1px solid #bdc3c7';
             }
         }
 
@@ -576,7 +583,7 @@ class WallGame {
         const cells = document.querySelectorAll('.cell');
         cells.forEach(cell => {
             cell.style.backgroundColor = '';
-            cell.style.border = '1px solid #95a5a6';
+            cell.style.border = '1px solid #bdc3c7';
         });
     }
 
@@ -1019,7 +1026,7 @@ class WallGame {
                 
                 // 重置单元格样式
                 fromCell.style.backgroundColor = '';
-                fromCell.style.border = '1px solid #95a5a6';
+                fromCell.style.border = '1px solid #bdc3c7';
             }
         }
 
@@ -1360,65 +1367,6 @@ class WallGame {
     }
 }
 
-// 添加领地样式
-const territoryStyles = `
-.cell.territory-player1 { background-color: rgba(255, 107, 107, 0.2) !important; }
-.cell.territory-player2 { background-color: rgba(78, 205, 196, 0.2) !important; }
-.cell.territory-player3 { background-color: rgba(255, 234, 167, 0.2) !important; }
-.cell.territory-player4 { background-color: rgba(162, 155, 254, 0.2) !important; }
-
-/* 移动端优化 */
-@media (max-width: 768px) {
-    .game-board {
-        width: 100% !important;
-        max-width: 400px;
-        height: auto !important;
-        aspect-ratio: 1 / 1;
-    }
-    
-    .wall-option {
-        width: 40px !important;
-        height: 40px !important;
-        font-size: 16px !important;
-    }
-    
-    .header-btn, .control-btn {
-        padding: 12px 16px !important;
-        font-size: 14px !important;
-    }
-    
-    .player-info {
-        padding: 12px !important;
-    }
-    
-    .player-stats {
-        grid-template-columns: 1fr !important;
-    }
-}
-
-/* 防止移动端缩放 */
-@media (max-width: 768px) {
-    .game-container {
-        -webkit-text-size-adjust: 100%;
-    }
-    
-    .game-main {
-        grid-template-columns: 1fr !important;
-        gap: 16px !important;
-        padding: 16px !important;
-    }
-    
-    .info-section {
-        order: -1;
-    }
-}
-`;
-
-// 添加样式到页面
-const styleSheet = document.createElement('style');
-styleSheet.textContent = territoryStyles;
-document.head.appendChild(styleSheet);
-
 // 游戏初始化
 document.addEventListener('DOMContentLoaded', () => {
     console.log('=== 游戏页面加载完成 ===');
@@ -1440,4 +1388,3 @@ document.addEventListener('DOMContentLoaded', () => {
         window.location.href = 'index.html';
     }
 });
-
