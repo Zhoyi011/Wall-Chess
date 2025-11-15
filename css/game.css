@@ -2,6 +2,7 @@
 .game-container {
     min-height: 100vh;
     background: linear-gradient(135deg, var(--dark-color), var(--darker-color));
+    background-attachment: fixed;
     display: flex;
     flex-direction: column;
 }
@@ -90,6 +91,7 @@
     max-width: 1400px;
     margin: 0 auto;
     width: 100%;
+    min-height: calc(100vh - 120px);
 }
 
 /* 棋盘区域 */
@@ -97,6 +99,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    min-height: 500px;
 }
 
 .board-container {
@@ -642,6 +645,8 @@
     .game-main {
         grid-template-columns: 1fr;
         gap: 16px;
+        padding: 16px;
+        min-height: auto;
     }
     
     .info-section {
@@ -661,6 +666,10 @@
     .game-board {
         width: 400px;
         height: 400px;
+    }
+    
+    .board-section {
+        min-height: 400px;
     }
 }
 
@@ -703,6 +712,10 @@
         width: 350px;
         height: 350px;
     }
+    
+    .board-section {
+        min-height: 350px;
+    }
 }
 
 @media (max-width: 480px) {
@@ -737,5 +750,38 @@
     .game-board {
         width: 300px;
         height: 300px;
+    }
+    
+    .board-section {
+        min-height: 300px;
+    }
+    
+    /* 确保移动端背景完整 */
+    .game-container {
+        background: linear-gradient(135deg, var(--dark-color), var(--darker-color));
+        background-size: cover;
+        background-attachment: scroll;
+    }
+}
+
+/* 特别针对竖屏移动端优化 */
+@media (max-width: 768px) and (orientation: portrait) {
+    .game-container {
+        background: linear-gradient(180deg, var(--dark-color), var(--darker-color));
+        min-height: 100vh;
+    }
+    
+    .game-main {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 1fr;
+        min-height: calc(100vh - 100px);
+    }
+    
+    .board-section {
+        order: 2;
+    }
+    
+    .info-section {
+        order: 1;
     }
 }
