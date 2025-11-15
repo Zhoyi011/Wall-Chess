@@ -128,7 +128,7 @@ class WallGame {
     }
 
     drawWalls() {
-        console.log('开始绘制围墙，水平围墙:', this.horizontalWalls, '垂直围墙:', this.verticalWalls);
+        console.log('开始绘制围墙...');
         
         // 清除现有围墙
         const existingWalls = document.querySelectorAll('.wall');
@@ -150,7 +150,7 @@ class WallGame {
 
         let wallCount = 0;
 
-        // 绘制水平围墙
+        // 绘制水平围墙 - 修正位置计算
         for (let y = 0; y < this.horizontalWalls.length; y++) {
             for (let x = 0; x < this.horizontalWalls[y].length; x++) {
                 if (this.horizontalWalls[y][x]) {
@@ -160,21 +160,20 @@ class WallGame {
                         position: absolute;
                         background-color: #2c3e50;
                         width: ${cellSize}px;
-                        height: 8px;
+                        height: 6px;
                         left: ${x * cellSize}px;
-                        top: ${(y - 0.5) * cellSize}px;
+                        top: ${y * cellSize - 3}px;
                         z-index: 5;
                         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-                        border-radius: 2px;
+                        border-radius: 1px;
                     `;
                     fragment.appendChild(wall);
                     wallCount++;
-                    console.log(`绘制水平围墙: (${x}, ${y})`);
                 }
             }
         }
 
-        // 绘制垂直围墙
+        // 绘制垂直围墙 - 修正位置计算
         for (let x = 0; x < this.verticalWalls.length; x++) {
             for (let y = 0; y < this.verticalWalls[x].length; y++) {
                 if (this.verticalWalls[x][y]) {
@@ -183,17 +182,16 @@ class WallGame {
                     wall.style.cssText = `
                         position: absolute;
                         background-color: #2c3e50;
-                        width: 8px;
+                        width: 6px;
                         height: ${cellSize}px;
-                        left: ${(x - 0.5) * cellSize}px;
+                        left: ${x * cellSize - 3}px;
                         top: ${y * cellSize}px;
                         z-index: 5;
                         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-                        border-radius: 2px;
+                        border-radius: 1px;
                     `;
                     fragment.appendChild(wall);
                     wallCount++;
-                    console.log(`绘制垂直围墙: (${x}, ${y})`);
                 }
             }
         }
@@ -749,6 +747,129 @@ class WallGame {
         }
     }
 
+    async makeAIMove() {
+        console.log('AI开始思考...');
+        const aiPlayer = this.aiPlayers.get(this.currentPlayer);
+        if (!aiPlayer) {
+            console.log('找不到AI玩家，跳过回合');
+            this.switchToNextPlayer();
+            return;
+        }
+
+        try {
+            // 显示AI思考指示器
+            aiPlayer.showThinkingIndicator();
+            
+            // 等待AI思考时间
+            await Utils.wait(aiPlayer.getThinkingTime());
+
+            const gameState = {
+                boardSize: this.boardSize,
+                cells: this.cells,
+                horizontalWalls: this.horizontalWalls,
+                verticalWalls: this.verticalWalls,
+                players: this.players,
+                phase: this.phase,
+                currentPlayer: this.currentPlayer
+            };
+
+            const move = await aiPlayer.makeMove(gameState);
+            
+            if (move) {
+                console.log('AI决定移动:', move);
+                
+                if (move.type === 'placement') {
+                    // AI放置棋子
+                    this.placePiece(move.x, move.y);
+                } else if (move.type === 'movement') {
+                    // AI移动棋子
+                    this.selectPieceForAI(move.fromX, move.fromY);
+                    await Utils.wait(500); // 等待一下让玩家看到选择
+                    this.movePieceForAI(move.toX, move.toY);
+                    
+                    // AI放置围墙
+                    await Utils.wait(500);
+                    const wallOptions = aiPlayer.getWallOptionsForAI(gameState, move.toX, move.toY);
+                    const bestWall = aiPlayer.chooseBestWallOption(wallOptions);
+                    
+                    if (bestWall) {
+                        console.log('AI选择围墙:', bestWall);
+                        this.placeWall(bestWall.wallX, bestWall.wallY, bestWall.orientation);
+                    } else {
+                        console.log('AI没有选择围墙，跳过');
+                        this.switchToNextPlayer();
+                        this.updateUI();
+                    }
+                }
+            } else {
+                console.log('AI没有有效移动，跳过回合');
+                this.switchToNextPlayer();
+                this.updateUI();
+            }
+        } catch (error) {
+            console.error('AI移动出错:', error);
+            this.switchToNextPlayer();
+            this.updateUI();
+        } finally {
+            // 隐藏AI思考指示器
+            aiPlayer.hideThinkingIndicator();
+        }
+    }
+
+    selectPieceForAI(x, y) {
+        console.log(`AI选择棋子: (${x}, ${y})`);
+        this.selectedPiece = { x, y };
+        this.clearHighlights();
+        
+        const selectedCell = document.querySelector(`.cell[data-x="${x}"][data-y="${y}"]`);
+        if (selectedCell) {
+            selectedCell.style.backgroundColor = 'rgba(241, 196, 15, 0.3)';
+            selectedCell.style.border = '2px solid #f1c40f';
+        }
+    }
+
+    movePieceForAI(x, y) {
+        if (!this.selectedPiece) return;
+
+        const fromX = this.selectedPiece.x;
+        const fromY = this.selectedPiece.y;
+
+        console.log(`AI移动棋子从 (${fromX}, ${fromY}) 到 (${x}, ${y})`);
+        this.saveGameState();
+
+        this.cells[fromY][fromX] = null;
+        this.cells[y][x] = this.currentPlayer;
+
+        // 移动DOM元素
+        const fromCell = document.querySelector(`.cell[data-x="${fromX}"][data-y="${fromY}"]`);
+        const toCell = document.querySelector(`.cell[data-x="${x}"][data-y="${y}"]`);
+        
+        if (fromCell && toCell) {
+            const piece = fromCell.querySelector('.piece');
+            if (piece) {
+                fromCell.removeChild(piece);
+                toCell.appendChild(piece);
+                
+                // 重置单元格样式
+                fromCell.style.backgroundColor = '';
+                fromCell.style.border = '1px solid #95a5a6';
+            }
+        }
+
+        // 更新棋子位置
+        const currentPlayer = this.players[this.currentPlayer];
+        const pieceObj = currentPlayer.pieces.find(p => p.x === fromX && p.y === fromY);
+        if (pieceObj) {
+            pieceObj.x = x;
+            pieceObj.y = y;
+        }
+
+        this.hasMoved = true;
+        this.clearHighlights();
+        
+        this.addGameLog(`${currentPlayer.name} 移动了棋子`);
+    }
+
     // 其他必要的方法...
     isValidMove(fromX, fromY, toX, toY) {
         if (toX < 0 || toX >= this.boardSize || toY < 0 || toY >= this.boardSize) {
@@ -799,22 +920,6 @@ class WallGame {
     isCurrentPlayerAI() {
         const currentPlayer = this.players[this.currentPlayer];
         return currentPlayer.type.startsWith('ai-');
-    }
-
-    async makeAIMove() {
-        console.log('AI开始思考...');
-        // 简化AI移动
-        if (this.phase === 'placement') {
-            // 随机放置棋子
-            for (let y = 0; y < this.boardSize; y++) {
-                for (let x = 0; x < this.boardSize; x++) {
-                    if (this.cells[y][x] === null) {
-                        this.placePiece(x, y);
-                        return;
-                    }
-                }
-            }
-        }
     }
 
     saveGameState() {
