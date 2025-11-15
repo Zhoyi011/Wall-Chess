@@ -15,7 +15,7 @@ class SettingsManager {
             theme: 'default',
             language: 'zh-CN',
             
-            // 游戏统计
+            // 游戏统计 - 确保有默认值
             gamesPlayed: 0,
             gamesWon: 0,
             bestScore: 0,
@@ -28,7 +28,15 @@ class SettingsManager {
 
     loadSettings() {
         const savedSettings = Utils.storage.get('gameSettings');
-        return { ...this.defaultSettings, ...savedSettings };
+        const mergedSettings = { ...this.defaultSettings, ...savedSettings };
+        
+        // 确保所有统计字段都存在
+        if (mergedSettings.gamesPlayed === undefined) mergedSettings.gamesPlayed = 0;
+        if (mergedSettings.gamesWon === undefined) mergedSettings.gamesWon = 0;
+        if (mergedSettings.bestScore === undefined) mergedSettings.bestScore = 0;
+        if (mergedSettings.totalPlayTime === undefined) mergedSettings.totalPlayTime = 0;
+        
+        return mergedSettings;
     }
 
     saveSettings() {
@@ -68,7 +76,8 @@ class SettingsManager {
 
     getWinRate() {
         if (this.settings.gamesPlayed === 0) return 0;
-        return Math.round((this.settings.gamesWon / this.settings.gamesPlayed) * 100);
+        const winRate = Math.round((this.settings.gamesWon / this.settings.gamesPlayed) * 100);
+        return isNaN(winRate) ? 0 : winRate;
     }
 
     // 获取游戏配置
